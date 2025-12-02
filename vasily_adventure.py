@@ -263,8 +263,8 @@ class GameObject:
             # Используем только спрайты из assets
             if self.object_type == "sword_in_stone" and sword_sprite:
                 screen.blit(sword_sprite, (self.x, self.y))
-            elif self.object_type == "boss" and boss_sprite:
-                # Босс больше в 2 раза
+            elif self.object_type == "boss" and boss_sprite and not self.defeated:
+                # Босс больше в 2 раза (только если не побежден)
                 scaled_boss = pygame.transform.scale(boss_sprite, (self.width * 2, self.height * 2))
                 screen.blit(scaled_boss, (self.x, self.y))
                 self.draw_hp_bar(screen)
@@ -313,7 +313,7 @@ class GameObject:
     
     def draw_hp_bar(self, screen):
         """Рисует полоску здоровья для босса"""
-        if self.object_type == "boss":
+        if self.object_type == "boss" and not self.defeated:
             bar_width = 150
             bar_height = 12
             # Босс масштабирован в 2 раза
@@ -354,15 +354,15 @@ class GameObject:
     
     def update(self):
         """Обновляет состояние объекта (для босса - таймеры атаки)"""
-        if self.object_type == "boss":
+        if self.object_type == "boss" and not self.defeated:
             self.attack_cooldown += 1
             if self.attack_cooldown >= self.attack_interval:
                 self.attack_cooldown = 0  # Босс может атаковать
     
     def get_attack_area(self):
         """Возвращает зону атаки босса"""
-        if self.object_type == "boss":
-            # Зона атаки босса - область впереди него
+        if self.object_type == "boss" and not self.defeated:
+            # Зона атаки босса - область впереди него (только если не побежден)
             return (self.x - 100, self.y, 100, self.height * 2)
         return None
 
@@ -399,9 +399,11 @@ class Scene:
                     screen.blit(worm_sprite, (i, SCREEN_HEIGHT - 200))
                 
         elif self.name == "boss_scene":
-            # Темный эффект для боя с мерцанием
-            alpha = 50 + math.sin(self.animation_timer * 0.1) * 20
-            screen.fill((int(alpha), int(alpha), int(alpha)), special_flags=pygame.BLEND_MULT)
+            # Темный эффект для боя с мерцанием (только если босс не побежден)
+            boss_defeated = any(obj.object_type == "boss" and obj.defeated for obj in self.objects)
+            if not boss_defeated:
+                alpha = 50 + math.sin(self.animation_timer * 0.1) * 20
+                screen.fill((int(alpha), int(alpha), int(alpha)), special_flags=pygame.BLEND_MULT)
             
         elif self.name == "keys_scene":
             # Пещера с летающими существами
@@ -610,8 +612,8 @@ def main():
                                 else:
                                     game_over = True
                     
-                    # Проверяем атаку босса на персонажа
-                    if obj.attack_cooldown == 0:  # Босс может атаковать
+                    # Проверяем атаку босса на персонажа (только если босс не побежден)
+                    if not obj.defeated and obj.attack_cooldown == 0:  # Босс может атаковать
                         boss_attack_area = obj.get_attack_area()
                         if boss_attack_area:
                             attack_x, attack_y, attack_w, attack_h = boss_attack_area
@@ -646,7 +648,13 @@ def main():
                 else:
                     interaction_center_x = vasily.x - 40  # Слева от персонажа
                 interaction_center_y = vasily.y + hero_sprite_height // 2
-                if (abs(interaction_center_x - obj.x) < 80 and abs(interaction_center_y - obj.y) < 80 and not obj.collected):
+                # Центр объекта для проверки взаимодействия
+                obj_center_x = obj.x + obj.width // 2
+                obj_center_y = obj.y + obj.height // 2
+                # Проверяем расстояние между центрами зон взаимодействия
+                distance_x = abs(interaction_center_x - obj_center_x)
+                distance_y = abs(interaction_center_y - obj_center_y)
+                if (distance_x < 80 and distance_y < 80 and not obj.collected):
                     if obj.object_type == "sword_in_stone" and not vasily.has_sword and keys[pygame.K_e]:
                         vasily.has_sword = True
                         obj.collected = True
@@ -699,8 +707,8 @@ def main():
                                     else:
                                         game_over = True
                         
-                        # Проверяем атаку босса на персонажа
-                        if obj.attack_cooldown == 0:  # Босс может атаковать
+                        # Проверяем атаку босса на персонажа (только если босс не побежден)
+                        if not obj.defeated and obj.attack_cooldown == 0:  # Босс может атаковать
                             boss_attack_area = obj.get_attack_area()
                             if boss_attack_area:
                                 attack_x, attack_y, attack_w, attack_h = boss_attack_area
