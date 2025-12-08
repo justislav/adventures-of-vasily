@@ -83,6 +83,9 @@ class Vasily:
         self.attacking = False
         self.attack_timer = 0
         self.attack_duration = 15
+        self.attack_damage_dealt = False  # Флаг для отслеживания, был ли нанесен урон в текущей атаке
+        self.attack_cooldown = 0  # Таймер перезарядки атаки
+        self.attack_cooldown_duration = 30  # Длительность перезарядки (0.5 секунды при 60 FPS)
         self.health = 100
         self.max_health = 100
         self.invulnerable = False
@@ -175,9 +178,10 @@ class Vasily:
         pygame.draw.rect(screen, BLACK, (bar_x, bar_y, bar_width, bar_height), 2)
     
     def attack(self):
-        if not self.attacking:
+        if not self.attacking and self.attack_cooldown == 0:
             self.attacking = True
             self.attack_timer = 0
+            self.attack_damage_dealt = False  # Сбрасываем флаг при начале новой атаки
             return True
         return False
     
@@ -222,6 +226,12 @@ class Vasily:
             if self.attack_timer >= self.attack_duration:
                 self.attacking = False
                 self.attack_timer = 0
+                self.attack_damage_dealt = False  # Сбрасываем флаг при завершении атаки
+                self.attack_cooldown = self.attack_cooldown_duration  # Запускаем перезарядку после атаки
+        
+        # Уменьшаем таймер перезарядки
+        if self.attack_cooldown > 0:
+            self.attack_cooldown -= 1
         
         if self.invulnerable:
             self.invulnerable_timer += 1
@@ -244,14 +254,20 @@ class GameObject:
         self.color = color
         self.object_type = object_type
         self.collected = False
-        self.hp = 100 if object_type == "boss" else 1
-        self.max_hp = 100 if object_type == "boss" else 1
+        self.hp = 50 if object_type == "boss" else 1
+        self.max_hp = 50 if object_type == "boss" else 1
         self.animation_timer = 0
         self.original_y = y
         self.crystal_type = crystal_type  # Для фиксированного типа кристалла
         self.defeated = False  # Для босса
         self.attack_cooldown = 0  # Таймер перезарядки атаки босса
         self.attack_interval = 120  # Интервал между атаками босса (2 секунды при 60 FPS)
+        self.boss_speed = 2  # Скорость движения босса
+        self.target_x = x  # Целевая позиция X для босса
+        self.target_y = y  # Целевая позиция Y для босса
+        self.movement_delay = 30  # Таймер задержки движения (0.5 секунды = 30 кадров) - начинаем с задержкой
+        self.movement_delay_duration = 30  # Длительность задержки движения
+        self.boss_direction = "left"  # Направление босса: "left" или "right"
         
     def draw(self, screen):
         if not self.collected:
@@ -352,18 +368,65 @@ class GameObject:
             return (self.x, self.y, self.width * 2, self.height * 2)
         return (self.x, self.y, self.width, self.height)
     
-    def update(self):
-        """Обновляет состояние объекта (для босса - таймеры атаки)"""
+    def update(self, player_x=None, player_y=None):
+        """Обновляет состояние объекта (для босса - таймеры атаки и движение)"""
         if self.object_type == "boss" and not self.defeated:
-            self.attack_cooldown += 1
-            if self.attack_cooldown >= self.attack_interval:
-                self.attack_cooldown = 0  # Босс может атаковать
+            # Увеличиваем таймер перезарядки (не сбрасываем автоматически)
+            if self.attack_cooldown < self.attack_interval:
+                self.attack_cooldown += 1
+            
+            # Движение босса к игроку с задержкой
+            if player_x is not None and player_y is not None:
+                # Уменьшаем таймер задержки
+                if self.movement_delay > 0:
+                    self.movement_delay -= 1
+                else:
+                    # После задержки босс начинает двигаться к текущей позиции игрока
+                    # Плавное движение к позиции игрока
+                    dx = player_x - self.x
+                    dy = player_y - self.y
+                    distance = math.sqrt(dx * dx + dy * dy)
+                    
+                    if distance > 5:  # Двигаемся только если расстояние больше 5 пикселей
+                        # Нормализуем направление
+                        if distance > 0:
+                            dx = dx / distance
+                            dy = dy / distance
+                        
+                        # Двигаемся к игроку
+                        self.x += dx * self.boss_speed
+                        self.y += dy * self.boss_speed
     
-    def get_attack_area(self):
-        """Возвращает зону атаки босса"""
+    def get_attack_area(self, player_x=None):
+        """Возвращает зону атаки босса (направлена в сторону игрока - только одна сторона)"""
         if self.object_type == "boss" and not self.defeated:
-            # Зона атаки босса - область впереди него (только если не побежден)
-            return (self.x - 100, self.y, 100, self.height * 2)
+            # Определяем направление атаки в сторону игрока
+            if player_x is not None:
+                # Вычисляем центр босса для определения направления
+                boss_center_x = self.x + (self.width * 2) / 2
+                
+                # Если игрок справа от центра босса - атака справа
+                if player_x > boss_center_x:
+                    # Зона атаки справа от босса
+                    attack_width = 150
+                    attack_x = self.x + self.width * 2  # Начинается справа от босса
+                    attack_y = self.y
+                    attack_height = self.height * 2
+                    return (attack_x, attack_y, attack_width, attack_height)
+                else:
+                    # Зона атаки слева от босса
+                    attack_width = 150
+                    attack_x = self.x - 150  # Начинается слева от босса
+                    attack_y = self.y
+                    attack_height = self.height * 2
+                    return (attack_x, attack_y, attack_width, attack_height)
+            else:
+                # По умолчанию атака слева
+                attack_width = 150
+                attack_x = self.x - 150
+                attack_y = self.y
+                attack_height = self.height * 2
+                return (attack_x, attack_y, attack_width, attack_height)
         return None
 
 # Класс для сцены
@@ -390,13 +453,13 @@ class Scene:
             if bush_sprite:
                 for i in range(0, SCREEN_WIDTH, 200):
                     sway_offset = math.sin(self.animation_timer * 0.05 + i * 0.1) * 3
-                    screen.blit(bush_sprite, (i, SCREEN_HEIGHT - 200 + sway_offset))
+                    screen.blit(bush_sprite, (i, SCREEN_HEIGHT - 175 + sway_offset))  # 200 * 0.875 = 175
             
         elif self.name == "obstacle_scene":
             # Добавляем червей как препятствия
             if worm_sprite:
                 for i in range(200, SCREEN_WIDTH, 300):
-                    screen.blit(worm_sprite, (i, SCREEN_HEIGHT - 200))
+                    screen.blit(worm_sprite, (i, SCREEN_HEIGHT - 175))  # 200 * 0.875 = 175
                 
         elif self.name == "boss_scene":
             # Темный эффект для боя с мерцанием (только если босс не побежден)
@@ -410,13 +473,13 @@ class Scene:
             if flying_creature_sprite:
                 for i in range(100, SCREEN_WIDTH, 250):
                     fly_offset = math.sin(self.animation_timer * 0.08 + i * 0.2) * 10
-                    screen.blit(flying_creature_sprite, (i, SCREEN_HEIGHT - 300 + fly_offset))
+                    screen.blit(flying_creature_sprite, (i, SCREEN_HEIGHT - 263 + fly_offset))  # 300 * 0.875 = 263
             
             # Добавляем переворачивающихся существ
             if flipping_creature_sprite:
                 for i in range(150, SCREEN_WIDTH, 400):
                     flip_offset = math.sin(self.animation_timer * 0.06 + i * 0.15) * 8
-                    screen.blit(flipping_creature_sprite, (i, SCREEN_HEIGHT - 250 + flip_offset))
+                    screen.blit(flipping_creature_sprite, (i, SCREEN_HEIGHT - 219 + flip_offset))  # 250 * 0.875 = 219
             
         elif self.name == "door_scene":
             # Новый остров с анимированным солнцем (без зеленой лужи)
@@ -429,44 +492,45 @@ class Scene:
 
 # Создание сцен
 def create_scenes():
-    scenes = []
-    
     # Все объекты спавнятся в средней части экрана, не слишком низко и не слева
-    # Объекты Y позиция: примерно на высоте 400-500 (средняя треть экрана)
+    # Объекты Y позиция: примерно на высоте 350-394 (средняя треть экрана, скорректировано для SCREEN_HEIGHT=700)
     
-    # Сцена 1: Доставание меча из камня + первый ключ
+    # Сцена 1: Доставание меча из камня + первый ключ + первый кристалл (ВСЕГДА ПЕРВАЯ)
     sword_scene = Scene("sword_scene", (34, 139, 34), [
-        GameObject(SCREEN_WIDTH//2 - 50, 400, 100, 100, GRAY, "sword_in_stone"),
-        GameObject(300, 450, 30, 30, YELLOW, "key")
+        GameObject(SCREEN_WIDTH//2 - 50, 350, 100, 100, GRAY, "sword_in_stone"),  # 400 * 0.875 = 350
+        GameObject(300, 394, 30, 30, YELLOW, "key"),  # 450 * 0.875 = 394
+        GameObject(800, 350, 30, 30, PURPLE, "crystal", crystal_type=0)  # Первый кристалл
     ])
-    scenes.append(sword_scene)
     
-    # Сцена 2: Преодоление препятствий + второй ключ
+    # Сцена 2: Преодоление препятствий + второй ключ + второй кристалл
     obstacle_scene = Scene("obstacle_scene", (135, 206, 235), [
-        GameObject(600, 450, 30, 30, YELLOW, "key")
+        GameObject(600, 394, 30, 30, YELLOW, "key"),  # 450 * 0.875 = 394
+        GameObject(900, 350, 30, 30, PURPLE, "crystal", crystal_type=1)  # Второй кристалл
     ])
-    scenes.append(obstacle_scene)
     
-    # Сцена 3: Бой с боссом + третий ключ (НЕ МОЖЕТ БЫТЬ ПЕРВОЙ)
+    # Сцена 3: Бой с боссом + третий ключ + третий кристалл
     boss_scene = Scene("boss_scene", (0, 50, 0), [
-        GameObject(int(SCREEN_WIDTH * 2/3), SCREEN_HEIGHT - 300, 150, 200, GREEN, "boss"),  # На 2/3 ширины экрана
-        GameObject(150, 450, 30, 30, YELLOW, "key")
+        GameObject(int(SCREEN_WIDTH * 2/3), SCREEN_HEIGHT - 263, 150, 200, GREEN, "boss"),  # (SCREEN_HEIGHT - 300) * 0.875 = SCREEN_HEIGHT - 263
+        GameObject(150, 394, 30, 30, YELLOW, "key"),  # 450 * 0.875 = 394
+        GameObject(400, 350, 30, 30, PURPLE, "crystal", crystal_type=2)  # Третий кристалл
     ])
-    scenes.append(boss_scene)
     
-    # Сцена 4: Поиск кристаллов (без ключей) - фиксированные типы
+    # Сцена 4: Поиск кристаллов (без ключей и кристаллов - они теперь в других сценах)
     keys_scene = Scene("keys_scene", (50, 25, 0), [
-        GameObject(300, 450, 30, 30, PURPLE, "crystal", crystal_type=0),  # crystals_1
-        GameObject(600, 400, 30, 30, PURPLE, "crystal", crystal_type=1),  # crystals_2
-        GameObject(900, 420, 30, 30, PURPLE, "crystal", crystal_type=2)   # crystals_3
+        # Кристаллы теперь распределены по другим сценам
     ])
-    scenes.append(keys_scene)
     
-    # Сцена 5: Открытие двери
+    # Сцена 5: Открытие двери (ВСЕГДА ПОСЛЕДНЯЯ)
     door_scene = Scene("door_scene", (135, 206, 235), [
-        GameObject(SCREEN_WIDTH - 150, 350, 100, 150, BROWN, "door")
+        GameObject(SCREEN_WIDTH - 150, 306, 100, 150, BROWN, "door")  # 350 * 0.875 = 306
     ])
-    scenes.append(door_scene)
+    
+    # Перемешиваем средние сцены случайным образом
+    middle_scenes = [obstacle_scene, boss_scene, keys_scene]
+    random.shuffle(middle_scenes)
+    
+    # Собираем финальный список: первая сцена + перемешанные + последняя сцена
+    scenes = [sword_scene] + middle_scenes + [door_scene]
     
     return scenes
 
@@ -494,7 +558,10 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_F11:
+                if event.key == pygame.K_ESCAPE:
+                    # Выход из игры по Escape
+                    running = False
+                elif event.key == pygame.K_F11:
                     # Переключение полноэкранного режима
                     fullscreen = not fullscreen
                     if fullscreen:
@@ -504,6 +571,10 @@ def main():
                     else:
                         screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
                     pygame.display.set_caption("Приключения Василия - Финальная версия (F11 - полноэкранный режим)")
+                elif event.key == pygame.K_SPACE:
+                    # Атака только при нажатии пробела (не при удержании)
+                    if not game_over and not victory:
+                        vasily.attack()
         
         if not game_over and not victory:
             # Управление Василием
@@ -520,10 +591,6 @@ def main():
                 dy = -1
             if keys[pygame.K_DOWN] or keys[pygame.K_s]:
                 dy = 1
-            
-            # Атака на SPACE (только если есть меч)
-            if keys[pygame.K_SPACE]:
-                vasily.attack()
             
             # Ограничение движения в пределах экрана (используем реальные размеры спрайта)
             # Получаем текущий спрайт
@@ -576,12 +643,12 @@ def main():
             # Сначала проверяем босса отдельно - он должен всегда обновляться и атаковать
             for obj in current_scene_obj.objects:
                 if obj.object_type == "boss":
-                    # Обновляем босса
-                    obj.update()
+                    # Обновляем босса (передаем позицию игрока для движения)
+                    obj.update(vasily.x, vasily.y)
                     
                     # Проверяем атаку персонажа на босса
                     attack_hitbox = vasily.get_attack_hitbox()
-                    if attack_hitbox and vasily.attacking:
+                    if attack_hitbox and vasily.attacking and not vasily.attack_damage_dealt:
                         hitbox_x, hitbox_y, hitbox_radius = attack_hitbox
                         boss_hitbox = obj.get_hitbox()
                         boss_x, boss_y, boss_w, boss_h = boss_hitbox
@@ -591,16 +658,18 @@ def main():
                             hitbox_y + hitbox_radius > boss_y and hitbox_y - hitbox_radius < boss_y + boss_h):
                             
                             if vasily.has_sword:
-                                # Атака с мечом - урон 10 HP
+                                # Атака с мечом - урон 10 HP (только один раз за атаку)
                                 if obj.take_damage(10):
                                     print("Босс побежден!")
                                     current_scene_obj.completed = True
                                 else:
                                     print(f"Босс получил урон! HP: {obj.hp}/{obj.max_hp}")
+                                vasily.attack_damage_dealt = True  # Отмечаем, что урон нанесен
                             else:
                                 # Атака без меча - урон персонажу и переход на сцену меча
                                 vasily.take_damage(20)
                                 print("Василий атаковал босса без меча! Получил 20 урона!")
+                                vasily.attack_damage_dealt = True  # Отмечаем, что урон нанесен
                                 if vasily.health > 0:
                                     # Переход на сцену меча (первая сцена)
                                     current_scene = 0
@@ -613,8 +682,8 @@ def main():
                                     game_over = True
                     
                     # Проверяем атаку босса на персонажа (только если босс не побежден)
-                    if not obj.defeated and obj.attack_cooldown == 0:  # Босс может атаковать
-                        boss_attack_area = obj.get_attack_area()
+                    if not obj.defeated and obj.attack_cooldown >= obj.attack_interval:  # Босс может атаковать (перезарядка завершена)
+                        boss_attack_area = obj.get_attack_area(vasily.x)  # Передаем позицию игрока для направления атаки
                         if boss_attack_area:
                             attack_x, attack_y, attack_w, attack_h = boss_attack_area
                             
@@ -636,7 +705,7 @@ def main():
                                     game_over = True
                                 else:
                                     print("Босс атаковал Василия! -15 HP")
-                                obj.attack_cooldown = -1  # Устанавливаем задержку перед следующей атакой
+                                obj.attack_cooldown = 0  # Сбрасываем перезарядку, начинаем новый цикл
             
             # Теперь проверяем обычные объекты (ключи, кристаллы, меч, дверь)
             for obj in current_scene_obj.objects:
@@ -671,12 +740,12 @@ def main():
                         print("Василий открыл дверь и попал на новый остров!")
                         victory = True
                     elif obj.object_type == "boss":
-                        # Обновляем босса
-                        obj.update()
+                        # Обновляем босса (передаем позицию игрока для движения)
+                        obj.update(vasily.x, vasily.y)
                         
                         # Проверяем атаку персонажа на босса
                         attack_hitbox = vasily.get_attack_hitbox()
-                        if attack_hitbox and vasily.attacking:
+                        if attack_hitbox and vasily.attacking and not vasily.attack_damage_dealt:
                             hitbox_x, hitbox_y, hitbox_radius = attack_hitbox
                             boss_hitbox = obj.get_hitbox()
                             boss_x, boss_y, boss_w, boss_h = boss_hitbox
@@ -686,16 +755,18 @@ def main():
                                 hitbox_y + hitbox_radius > boss_y and hitbox_y - hitbox_radius < boss_y + boss_h):
                                 
                                 if vasily.has_sword:
-                                    # Атака с мечом - урон 10 HP
+                                    # Атака с мечом - урон 10 HP (только один раз за атаку)
                                     if obj.take_damage(10):
                                         print("Босс побежден!")
                                         current_scene_obj.completed = True
                                     else:
                                         print(f"Босс получил урон! HP: {obj.hp}/{obj.max_hp}")
+                                    vasily.attack_damage_dealt = True  # Отмечаем, что урон нанесен
                                 else:
                                     # Атака без меча - урон персонажу и переход на сцену меча
                                     vasily.take_damage(20)
                                     print("Василий атаковал босса без меча! Получил 20 урона!")
+                                    vasily.attack_damage_dealt = True  # Отмечаем, что урон нанесен
                                     if vasily.health > 0:
                                         # Переход на сцену меча (первая сцена)
                                         current_scene = 0
@@ -708,8 +779,8 @@ def main():
                                         game_over = True
                         
                         # Проверяем атаку босса на персонажа (только если босс не побежден)
-                        if not obj.defeated and obj.attack_cooldown == 0:  # Босс может атаковать
-                            boss_attack_area = obj.get_attack_area()
+                        if not obj.defeated and obj.attack_cooldown >= obj.attack_interval:  # Босс может атаковать (перезарядка завершена)
+                            boss_attack_area = obj.get_attack_area(vasily.x)  # Передаем позицию игрока для направления атаки
                             if boss_attack_area:
                                 attack_x, attack_y, attack_w, attack_h = boss_attack_area
                                 
@@ -731,7 +802,7 @@ def main():
                                         game_over = True
                                     else:
                                         print("Босс атаковал Василия! -15 HP")
-                                    obj.attack_cooldown = -1  # Устанавливаем задержку перед следующей атакой
+                                    obj.attack_cooldown = 0  # Сбрасываем перезарядку, начинаем новый цикл
             
             # Проверка смерти персонажа
             if vasily.health <= 0:
