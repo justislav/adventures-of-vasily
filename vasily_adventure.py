@@ -27,16 +27,16 @@ def load_image(filename, scale=1):
         print(f"Ошибка загрузки {filename}: {e}")
         return None
 
-# Загружаем ассеты с правильными масштабами
-background_far = load_image("assets/background/background_layer_far.png", 1.0)
+# Загружаем ассеты с правильными масштабами (уровень 1)
+background_far = load_image("assets/level_1/background/background_layer_far.png", 1.0)
 
 # Персонаж 20% по высоте экрана
 hero_no_sword_sprite = load_image("assets/characters/hero_no_sword.png", SCREEN_HEIGHT * 0.20 / 460)
 hero_with_sword_sprite = load_image("assets/characters/hero_with_sword.png", SCREEN_HEIGHT * 0.20 / 460)
 hero_attack_sprite = load_image("assets/characters/hero_attack.png", SCREEN_HEIGHT * 0.20 / 460)
 
-# Объекты 15% по высоте экрана
-sword_sprite = load_image("assets/objects/sword_in_stone.png", SCREEN_HEIGHT * 0.15 / 180)
+# Объекты 15% по высоте экрана (меч из level_1/weapon)
+sword_sprite = load_image("assets/level_1/weapon/sword_in_stone.png", SCREEN_HEIGHT * 0.15 / 180)
 crystal_1_sprite = load_image("assets/objects/crystals_1.png", SCREEN_HEIGHT * 0.15 / 280)
 crystal_2_sprite = load_image("assets/objects/crystals_2.png", SCREEN_HEIGHT * 0.15 / 280)
 crystal_3_sprite = load_image("assets/objects/crystals_3.png", SCREEN_HEIGHT * 0.15 / 280)
@@ -52,8 +52,8 @@ flipping_creature_sprite = load_image("assets/characters/flipping_creature.png",
 # Дверь 40% по высоте экрана
 door_sprite = load_image("assets/objects/door.png", SCREEN_HEIGHT * 0.40 / 460)
 
-# Босс 40% по высоте экрана
-boss_sprite = load_image("assets/enemies/enemy_boss.png", SCREEN_HEIGHT * 0.40 / 540)
+# Босс 40% по высоте экрана (boss из level_1)
+boss_sprite = load_image("assets/level_1/boss/enemy_boss.png", SCREEN_HEIGHT * 0.40 / 540)
 
 # Цвета
 WHITE = (255, 255, 255)

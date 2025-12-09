@@ -31,7 +31,7 @@
 
 ### sword_scene
 1. **Сцена меча** - лесная местность с кустами, меч в камне, первый ключ, первый кристалл
-   - **Ассеты:** `background_layer_far.png`, `enemy_bush.png`, `sword_in_stone.png`, `key.png`, `crystals_1.png`, `hero_no_sword.png`/`hero_with_sword.png`/`hero_attack.png`
+   - **Ассеты:** `assets/level_1/background/background_layer_far.png`, `enemy_bush.png`, `assets/level_1/weapon/sword_in_stone.png`, `key.png`, `crystals_1.png`, `hero_no_sword.png`/`hero_with_sword.png`/`hero_attack.png`
    - **кратко**: Лес. Василий находит меч в камне, первый ключ и первый кристалл (crystal_type=0).
    - **объекты**: меч в камне, ключ, кристалл тип 0 (crystals_1.png).
    - **назад**: нет (возврат запрещён) если нет 3 ключей; если есть все 3 ключа, то можно.
@@ -39,7 +39,7 @@
 
 ### obstacle_scene
 2. **Сцена препятствий** - горная местность с червями-препятствиями, второй ключ, второй кристалл
-   - **Ассеты:** `background_layer_far.png`, `enemy_worm.png`, `key.png`, `crystals_2.png`, `hero_no_sword.png`/`hero_with_sword.png`/`hero_attack.png`
+   - **Ассеты:** `assets/level_1/background/background_layer_far.png`, `enemy_worm.png`, `key.png`, `crystals_2.png`, `hero_no_sword.png`/`hero_with_sword.png`/`hero_attack.png`
    - **кратко**: Горы с червями-препятствиями. Второй ключ и второй кристалл (crystal_type=1).
    - **объекты**: ключ, кристалл тип 1 (crystals_2.png) (черви — фоновые спрайты).
    - **назад**: да (влево, с задержкой 1 сек).
@@ -47,8 +47,8 @@
 
 ### boss_scene
 3. **Сцена босса** - темная атмосфера с боссом (50 HP), третий ключ, третий кристалл, система боя (может быть в любой средней позиции)
-   - **Позиция босса:** на 2/3 ширины экрана (SCREEN_WIDTH * 2/3), больше в 2 раза чем персонаж
-   - **Ассеты:** `background_layer_far.png`, `enemy_boss.png`, `key.png`, `crystals_3.png`, `hero_no_sword.png`/`hero_with_sword.png`/`hero_attack.png`
+    - **Позиция босса:** на 2/3 ширины экрана (SCREEN_WIDTH * 2/3), больше в 2 раза чем персонаж
+    - **Ассеты:** `assets/level_1/background/background_layer_far.png`, `assets/level_1/boss/enemy_boss.png`, `key.png`, `crystals_3.png`, `hero_no_sword.png`/`hero_with_sword.png`/`hero_attack.png`
    - **кратко**: Темная сцена с боссом (50 HP), третьим ключом и третьим кристаллом (crystal_type=2); без победы дальше нельзя.
    - **объекты**: босс (с визуальным хитбоксом), ключ, кристалл тип 2 (crystals_3.png).
    - **назад**: нет (возврат запрещён), пока не победил босса; да (влево, с задержкой 1 сек), если победил.
@@ -57,7 +57,7 @@
 
 ### keys_scene
 4. **Сцена кристаллов** - пещера с летающими существами (кристаллы теперь распределены по разным сценам)
-   - **Ассеты:** `background_layer_far.png`, `flying_creature.png`, `flipping_creature.png`, `enemy_flying_creature.png`, `hero_no_sword.png`/`hero_with_sword.png`/`hero_attack.png`
+    - **Ассеты:** `assets/level_1/background/background_layer_far.png`, `flying_creature.png`, `flipping_creature.png`, `enemy_flying_creature.png`, `hero_no_sword.png`/`hero_with_sword.png`/`hero_attack.png`
    - **кратко**: Пещера с летающими существами (кристаллы теперь в других сценах).
    - **объекты**: нет (кристаллы распределены по другим сценам).
    - **назад**: да (влево, с задержкой 1 сек).
@@ -65,7 +65,7 @@
 
 ### door_scene
 5. **Сцена двери** - дверь может быть в любой средней комнате (перемешивается с остальными)
-   - **Ассеты:** `background_layer_far.png`, `door.png`, `hero_no_sword.png`/`hero_with_sword.png`/`hero_attack.png`
+    - **Ассеты:** `assets/level_1/background/background_layer_far.png`, `door.png`, `hero_no_sword.png`/`hero_with_sword.png`/`hero_attack.png`
    - **кратко**: Дверь для выхода; чтобы открыть, нужны 3 ключа и победа над боссом.
    - **объекты**: дверь.
    - **назад**: да (влево, с задержкой 1 сек).
