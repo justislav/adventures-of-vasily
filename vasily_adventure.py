@@ -783,6 +783,15 @@ def main():
                     # Рывок на пробел в сторону, куда смотрит персонаж
                     if not game_over and not victory:
                         vasily.dash()
+                elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
+                    # Переключение оружия (меч <-> трезубец)
+                    if not game_over and not victory and vasily.has_sword:
+                        if vasily.weapon_type == "sword":
+                            vasily.weapon_type = "trident"
+                            print("Василий переключился на трезубец!")
+                        elif vasily.weapon_type == "trident":
+                            vasily.weapon_type = "sword"
+                            print("Василий переключился на меч!")
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Левая кнопка мыши
                     # Атака на левую кнопку мыши
