@@ -98,6 +98,7 @@ class Vasily:
         self.attack_cooldown = 0  # Таймер перезарядки атаки
         self.attack_cooldown_duration = 30  # Длительность перезарядки (0.5 секунды при 60 FPS)
         self.weapon_type = "none"  # "none", "sword", "trident"
+        self.trident_cooldown_duration = 48  # Перезарядка трезубца (0.8 секунды при 60 FPS)
         self.dashing = False  # Флаг рывка
         self.dash_timer = 0  # Таймер рывка
         self.dash_duration = 10  # Длительность рывка (10 кадров)
@@ -118,13 +119,17 @@ class Vasily:
         # Выбираем правильный спрайт в зависимости от состояния
         current_sprite = None
         if self.attacking and self.has_sword:
-            if current_level == 2 and hero_trident_attack_sprite:
+            if self.weapon_type == "trident" and hero_trident_attack_sprite:
                 current_sprite = hero_trident_attack_sprite
+            elif self.weapon_type == "sword" and hero_attack_sprite:
+                current_sprite = hero_attack_sprite
             else:
                 current_sprite = hero_attack_sprite
         elif self.has_sword:
-            if current_level == 2 and hero_with_trident_sprite:
+            if self.weapon_type == "trident" and hero_with_trident_sprite:
                 current_sprite = hero_with_trident_sprite
+            elif self.weapon_type == "sword" and hero_with_sword_sprite:
+                current_sprite = hero_with_sword_sprite
             else:
                 current_sprite = hero_with_sword_sprite
         else:
@@ -160,11 +165,16 @@ class Vasily:
         
         # Эффект атаки - хитбокс с учетом направления
         if self.attacking:
-            if self.direction == "right":
-                hitbox_x = self.x + sprite_width + 20  # Справа от персонажа
+            # Для трезубца атака вверх, для меча - влево/вправо
+            if self.weapon_type == "trident":
+                hitbox_x = self.x + sprite_width // 2  # По центру по горизонтали
+                hitbox_y = self.y - 20  # Вверх от персонажа
             else:
-                hitbox_x = self.x - 20  # Слева от персонажа
-            hitbox_y = self.y + sprite_height//2   # По центру по вертикали
+                if self.direction == "right":
+                    hitbox_x = self.x + sprite_width + 20  # Справа от персонажа
+                else:
+                    hitbox_x = self.x - 20  # Слева от персонажа
+                hitbox_y = self.y + sprite_height//2   # По центру по вертикали
             pygame.draw.circle(screen, YELLOW, (hitbox_x, hitbox_y), 15, 4)
             # Дополнительные частицы
             for i in range(5):
@@ -180,13 +190,17 @@ class Vasily:
         # Выбираем правильный спрайт
         current_sprite = None
         if self.attacking and self.has_sword:
-            if current_level == 2 and hero_trident_attack_sprite:
+            if self.weapon_type == "trident" and hero_trident_attack_sprite:
                 current_sprite = hero_trident_attack_sprite
+            elif self.weapon_type == "sword" and hero_attack_sprite:
+                current_sprite = hero_attack_sprite
             else:
                 current_sprite = hero_attack_sprite
         elif self.has_sword:
-            if current_level == 2 and hero_with_trident_sprite:
+            if self.weapon_type == "trident" and hero_with_trident_sprite:
                 current_sprite = hero_with_trident_sprite
+            elif self.weapon_type == "sword" and hero_with_sword_sprite:
+                current_sprite = hero_with_sword_sprite
             else:
                 current_sprite = hero_with_sword_sprite
         else:
@@ -214,15 +228,23 @@ class Vasily:
             self.attacking = True
             self.attack_timer = 0
             self.attack_damage_dealt = False  # Сбрасываем флаг при начале новой атаки
+            # Устанавливаем перезарядку в зависимости от оружия
+            if self.weapon_type == "trident":
+                self.attack_cooldown = self.trident_cooldown_duration
+            else:
+                self.attack_cooldown = self.attack_cooldown_duration
             return True
         return False
 
     def get_attack_damage(self):
         """Возвращает урон атаки.
+        - 15, если трезубец
         - 15, если атака во время рывка
         - 11, если собрано 3 кристалла
         - 10, по умолчанию
         """
+        if self.weapon_type == "trident":
+            return 15
         if self.dashing:
             return 15
         return 11 if self.crystals >= 3 else 10
@@ -247,13 +269,17 @@ class Vasily:
             # Выбираем правильный спрайт
             current_sprite = None
             if self.attacking and self.has_sword:
-                if current_level == 2 and hero_trident_attack_sprite:
+                if self.weapon_type == "trident" and hero_trident_attack_sprite:
                     current_sprite = hero_trident_attack_sprite
+                elif self.weapon_type == "sword" and hero_attack_sprite:
+                    current_sprite = hero_attack_sprite
                 else:
                     current_sprite = hero_attack_sprite
             elif self.has_sword:
-                if current_level == 2 and hero_with_trident_sprite:
+                if self.weapon_type == "trident" and hero_with_trident_sprite:
                     current_sprite = hero_with_trident_sprite
+                elif self.weapon_type == "sword" and hero_with_sword_sprite:
+                    current_sprite = hero_with_sword_sprite
                 else:
                     current_sprite = hero_with_sword_sprite
             else:
@@ -262,13 +288,19 @@ class Vasily:
             sprite_width = current_sprite.get_width() if current_sprite else self.width
             sprite_height = current_sprite.get_height() if current_sprite else self.height
             
-            # Хитбокс в зависимости от направления
-            if self.direction == "right":
-                hitbox_x = self.x + sprite_width + 20  # Справа от персонажа
+            # Для трезубца атака вверх, для меча - влево/вправо
+            if self.weapon_type == "trident":
+                # Трезубец бьёт вверх
+                hitbox_x = self.x + sprite_width // 2  # По центру по горизонтали
+                hitbox_y = self.y - 20  # Вверх от персонажа
             else:
-                hitbox_x = self.x - 20  # Слева от персонажа
+                # Меч бьёт влево/вправо
+                if self.direction == "right":
+                    hitbox_x = self.x + sprite_width + 20  # Справа от персонажа
+                else:
+                    hitbox_x = self.x - 20  # Слева от персонажа
+                hitbox_y = self.y + sprite_height//2   # По центру по вертикали
             
-            hitbox_y = self.y + sprite_height//2   # По центру по вертикали
             return (hitbox_x, hitbox_y, 15)  # x, y, radius
         return None
 
@@ -776,12 +808,12 @@ def main():
             # Ограничение движения в пределах экрана (используем реальные размеры спрайта)
             # Получаем текущий спрайт
             if vasily.attacking and vasily.has_sword:
-                if current_level == 2 and hero_trident_attack_sprite:
+                if vasily.weapon_type == "trident" and hero_trident_attack_sprite:
                     temp_sprite = hero_trident_attack_sprite
                 else:
                     temp_sprite = hero_attack_sprite
             elif vasily.has_sword:
-                if current_level == 2 and hero_with_trident_sprite:
+                if vasily.weapon_type == "trident" and hero_with_trident_sprite:
                     temp_sprite = hero_with_trident_sprite
                 else:
                     temp_sprite = hero_with_sword_sprite
@@ -846,12 +878,12 @@ def main():
             
             # Получаем реальные размеры спрайта персонажа
             if vasily.attacking and vasily.has_sword:
-                if current_level == 2 and hero_trident_attack_sprite:
+                if vasily.weapon_type == "trident" and hero_trident_attack_sprite:
                     current_sprite = hero_trident_attack_sprite
                 else:
                     current_sprite = hero_attack_sprite
             elif vasily.has_sword:
-                if current_level == 2 and hero_with_trident_sprite:
+                if vasily.weapon_type == "trident" and hero_with_trident_sprite:
                     current_sprite = hero_with_trident_sprite
                 else:
                     current_sprite = hero_with_sword_sprite
@@ -973,8 +1005,10 @@ def main():
                         vasily.has_sword = True
                         obj.collected = True
                         if obj.object_type == "trident_in_stone":
+                            vasily.weapon_type = "trident"
                             print("Василий достал трезубец из камня!")
                         else:
+                            vasily.weapon_type = "sword"
                             print("Василий достал меч из камня!")
                     elif obj.object_type == "key" and keys[pygame.K_e]:
                         vasily.keys += 1
@@ -996,6 +1030,7 @@ def main():
                                     globals()["boss_sprite"] = boss2_sprite
                                 # Сбрасываем состояние
                                 vasily.has_sword = True  # На уровне 2 сразу с оружием
+                                vasily.weapon_type = "sword"  # На уровне 2 начинаем с меча
                                 vasily.keys = 0
                                 vasily.crystals = 0
                                 vasily.health = vasily.max_health
@@ -1058,12 +1093,12 @@ def main():
                                 
                                 # Получаем реальные размеры спрайта персонажа
                             if vasily.attacking and vasily.has_sword:
-                                if current_level == 2 and hero_trident_attack_sprite:
+                                if vasily.weapon_type == "trident" and hero_trident_attack_sprite:
                                     current_sprite_for_boss = hero_trident_attack_sprite
                                 else:
                                     current_sprite_for_boss = hero_attack_sprite
                             elif vasily.has_sword:
-                                if current_level == 2 and hero_with_trident_sprite:
+                                if vasily.weapon_type == "trident" and hero_with_trident_sprite:
                                     current_sprite_for_boss = hero_with_trident_sprite
                                 else:
                                     current_sprite_for_boss = hero_with_sword_sprite
@@ -1097,12 +1132,12 @@ def main():
             
             # Получаем реальный размер спрайта для проверки переходов
             if vasily.attacking and vasily.has_sword:
-                if current_level == 2 and hero_trident_attack_sprite:
+                if vasily.weapon_type == "trident" and hero_trident_attack_sprite:
                     temp_sprite_for_transition = hero_trident_attack_sprite
                 else:
                     temp_sprite_for_transition = hero_attack_sprite
             elif vasily.has_sword:
-                if current_level == 2 and hero_with_trident_sprite:
+                if vasily.weapon_type == "trident" and hero_with_trident_sprite:
                     temp_sprite_for_transition = hero_with_trident_sprite
                 else:
                     temp_sprite_for_transition = hero_with_sword_sprite
