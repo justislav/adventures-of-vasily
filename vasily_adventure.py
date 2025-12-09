@@ -34,6 +34,12 @@ background_far = load_image("assets/level_1/background/background_layer_far.png"
 hero_no_sword_sprite = load_image("assets/characters/hero_no_weapon.png", SCREEN_HEIGHT * 0.20 / 460)
 hero_with_sword_sprite = load_image("assets/characters/hero_with_sword.png", SCREEN_HEIGHT * 0.20 / 460)
 hero_attack_sprite = load_image("assets/characters/hero_with_sword_attack.png", SCREEN_HEIGHT * 0.20 / 460)
+# Персонаж с трезубцем (уровень 2)
+hero_with_trident_sprite = load_image("assets/characters/hero_with_trident.png", SCREEN_HEIGHT * 0.20 / 460)
+hero_trident_attack_sprite = load_image("assets/characters/hero_with_trident_attack.png", SCREEN_HEIGHT * 0.20 / 460)
+
+# Текущий уровень
+current_level = 1
 
 # Объекты 15% по высоте экрана (меч из level_1/weapon)
 sword_sprite = load_image("assets/level_1/weapon/sword_in_stone.png", SCREEN_HEIGHT * 0.15 / 180)
@@ -54,6 +60,11 @@ door_sprite = load_image("assets/objects/door.png", SCREEN_HEIGHT * 0.40 / 460)
 
 # Босс 40% по высоте экрана (boss из level_1)
 boss_sprite = load_image("assets/level_1/boss/enemy_boss.png", SCREEN_HEIGHT * 0.40 / 540)
+# Ассеты уровня 2
+background_level2 = load_image("assets/level_2/backgound/фон.png", 1.0)
+# Трезубец в камне — примерно рост персонажа (масштаб как у героя)
+trident_sprite = load_image("assets/level_2/weapon/трезубец_в_камне.png", SCREEN_HEIGHT * 0.20 / 180)
+boss2_sprite = load_image("assets/level_2/boss/boss 2 level.png", SCREEN_HEIGHT * 0.40 / 540)
 
 # Цвета
 WHITE = (255, 255, 255)
@@ -86,6 +97,7 @@ class Vasily:
         self.attack_damage_dealt = False  # Флаг для отслеживания, был ли нанесен урон в текущей атаке
         self.attack_cooldown = 0  # Таймер перезарядки атаки
         self.attack_cooldown_duration = 30  # Длительность перезарядки (0.5 секунды при 60 FPS)
+        self.weapon_type = "none"  # "none", "sword", "trident"
         self.dashing = False  # Флаг рывка
         self.dash_timer = 0  # Таймер рывка
         self.dash_duration = 10  # Длительность рывка (10 кадров)
@@ -106,9 +118,15 @@ class Vasily:
         # Выбираем правильный спрайт в зависимости от состояния
         current_sprite = None
         if self.attacking and self.has_sword:
-            current_sprite = hero_attack_sprite
+            if current_level == 2 and hero_trident_attack_sprite:
+                current_sprite = hero_trident_attack_sprite
+            else:
+                current_sprite = hero_attack_sprite
         elif self.has_sword:
-            current_sprite = hero_with_sword_sprite
+            if current_level == 2 and hero_with_trident_sprite:
+                current_sprite = hero_with_trident_sprite
+            else:
+                current_sprite = hero_with_sword_sprite
         else:
             current_sprite = hero_no_sword_sprite
         
@@ -162,9 +180,15 @@ class Vasily:
         # Выбираем правильный спрайт
         current_sprite = None
         if self.attacking and self.has_sword:
-            current_sprite = hero_attack_sprite
+            if current_level == 2 and hero_trident_attack_sprite:
+                current_sprite = hero_trident_attack_sprite
+            else:
+                current_sprite = hero_attack_sprite
         elif self.has_sword:
-            current_sprite = hero_with_sword_sprite
+            if current_level == 2 and hero_with_trident_sprite:
+                current_sprite = hero_with_trident_sprite
+            else:
+                current_sprite = hero_with_sword_sprite
         else:
             current_sprite = hero_no_sword_sprite
         
@@ -223,9 +247,15 @@ class Vasily:
             # Выбираем правильный спрайт
             current_sprite = None
             if self.attacking and self.has_sword:
-                current_sprite = hero_attack_sprite
+                if current_level == 2 and hero_trident_attack_sprite:
+                    current_sprite = hero_trident_attack_sprite
+                else:
+                    current_sprite = hero_attack_sprite
             elif self.has_sword:
-                current_sprite = hero_with_sword_sprite
+                if current_level == 2 and hero_with_trident_sprite:
+                    current_sprite = hero_with_trident_sprite
+                else:
+                    current_sprite = hero_with_sword_sprite
             else:
                 current_sprite = hero_no_sword_sprite
             
@@ -329,6 +359,8 @@ class GameObject:
             # Используем только спрайты из assets
             if self.object_type == "sword_in_stone" and sword_sprite:
                 screen.blit(sword_sprite, (self.x, self.y))
+            elif self.object_type == "trident_in_stone" and trident_sprite:
+                screen.blit(trident_sprite, (self.x, self.y))
             elif self.object_type == "boss" and boss_sprite and not self.defeated:
                 # Босс больше в 2 раза (только если не побежден)
                 scaled_boss = pygame.transform.scale(boss_sprite, (self.width * 2, self.height * 2))
@@ -388,7 +420,7 @@ class GameObject:
                 screen.blit(flipping_creature_sprite, (self.x, self.y))
             
             # ВИЗУАЛЬНЫЙ ДЕБАГ - зона взаимодействия для объектов
-            if self.object_type in ["sword_in_stone", "key", "crystal", "door"]:
+            if self.object_type in ["sword_in_stone", "trident_in_stone", "key", "crystal", "door"]:
                 interaction_center_x = self.x + self.width // 2
                 interaction_center_y = self.y + self.height // 2
                 pygame.draw.circle(screen, CYAN, (interaction_center_x, interaction_center_y), 40, 2)
@@ -638,6 +670,37 @@ def create_scenes():
     
     return scenes
 
+# Создание сцен уровня 2
+def create_level2_scenes():
+    scenes = []
+    # Сцена 1 уровня 2: трезубец + ключ + кристалл
+    scene1 = Scene("level2_weapon_scene", (34, 139, 34), [
+        GameObject(SCREEN_WIDTH//2 - 50, 350, 100, 100, GRAY, "trident_in_stone"),  # трезубец в камне
+        GameObject(300, 394, 30, 30, YELLOW, "key"),
+        GameObject(800, 350, 30, 30, PURPLE, "crystal", crystal_type=0)
+    ])
+    scenes.append(scene1)
+    
+    # Сцена 2 уровня 2: босс + два ключа + два кристалла + дверь
+    boss_lvl2 = GameObject(int(SCREEN_WIDTH * 2/3), SCREEN_HEIGHT - 263, 150, 200, GREEN, "boss")
+    boss_lvl2.hp = 100
+    boss_lvl2.max_hp = 100
+    scene2 = Scene("level2_boss_scene", (0, 50, 0), [
+        boss_lvl2,  # boss2 (спрайт заменим)
+        GameObject(150, 394, 30, 30, YELLOW, "key"),
+        GameObject(450, 394, 30, 30, YELLOW, "key"),
+        GameObject(300, 360, 30, 30, PURPLE, "crystal", crystal_type=1),
+        GameObject(600, 360, 30, 30, PURPLE, "crystal", crystal_type=2),
+        GameObject(900, 306, 100, 150, BROWN, "door")
+    ])
+    scenes.append(scene2)
+    
+    # Перемешиваем сцены уровня 2 (кроме первой weapon_scene)
+    middle = scenes[1:]
+    random.shuffle(middle)
+    scenes = [scenes[0]] + middle
+    return scenes
+
 # Основная функция игры
 def main():
     global screen, SCREEN_WIDTH, SCREEN_HEIGHT
@@ -656,6 +719,7 @@ def main():
     game_over = False
     victory = False
     boss_defeated = False  # Глобальный флаг победы над боссом
+    current_level = 1  # Текущий уровень (1 или 2)
 
     def reshuffle_middle_scenes():
         nonlocal scenes
@@ -711,11 +775,18 @@ def main():
             
             # Ограничение движения в пределах экрана (используем реальные размеры спрайта)
             # Получаем текущий спрайт
-            temp_sprite = hero_no_sword_sprite
-            if vasily.has_sword:
-                temp_sprite = hero_with_sword_sprite
             if vasily.attacking and vasily.has_sword:
-                temp_sprite = hero_attack_sprite
+                if current_level == 2 and hero_trident_attack_sprite:
+                    temp_sprite = hero_trident_attack_sprite
+                else:
+                    temp_sprite = hero_attack_sprite
+            elif vasily.has_sword:
+                if current_level == 2 and hero_with_trident_sprite:
+                    temp_sprite = hero_with_trident_sprite
+                else:
+                    temp_sprite = hero_with_sword_sprite
+            else:
+                temp_sprite = hero_no_sword_sprite
             
             sprite_width = temp_sprite.get_width() if temp_sprite else vasily.width
             sprite_height = temp_sprite.get_height() if temp_sprite else vasily.height
@@ -774,11 +845,16 @@ def main():
             interaction_hint = None  # Подсказка для взаимодействия (меч/ключ/кристалл)
             
             # Получаем реальные размеры спрайта персонажа
-            current_sprite = None
             if vasily.attacking and vasily.has_sword:
-                current_sprite = hero_attack_sprite
+                if current_level == 2 and hero_trident_attack_sprite:
+                    current_sprite = hero_trident_attack_sprite
+                else:
+                    current_sprite = hero_attack_sprite
             elif vasily.has_sword:
-                current_sprite = hero_with_sword_sprite
+                if current_level == 2 and hero_with_trident_sprite:
+                    current_sprite = hero_with_trident_sprite
+                else:
+                    current_sprite = hero_with_sword_sprite
             else:
                 current_sprite = hero_no_sword_sprite
             
@@ -834,11 +910,18 @@ def main():
                             attack_x, attack_y, attack_w, attack_h = boss_attack_area
                             
                             # Получаем реальные размеры спрайта персонажа
-                            current_sprite_for_boss = hero_no_sword_sprite
-                            if vasily.has_sword:
-                                current_sprite_for_boss = hero_with_sword_sprite
                             if vasily.attacking and vasily.has_sword:
-                                current_sprite_for_boss = hero_attack_sprite
+                                if current_level == 2 and hero_trident_attack_sprite:
+                                    current_sprite_for_boss = hero_trident_attack_sprite
+                                else:
+                                    current_sprite_for_boss = hero_attack_sprite
+                            elif vasily.has_sword:
+                                if current_level == 2 and hero_with_trident_sprite:
+                                    current_sprite_for_boss = hero_with_trident_sprite
+                                else:
+                                    current_sprite_for_boss = hero_with_sword_sprite
+                            else:
+                                current_sprite_for_boss = hero_no_sword_sprite
                             
                             hero_sprite_width = current_sprite_for_boss.get_width() if current_sprite_for_boss else vasily.width
                             hero_sprite_height = current_sprite_for_boss.get_height() if current_sprite_for_boss else vasily.height
@@ -872,7 +955,7 @@ def main():
                 distance_y = abs(interaction_center_y - obj_center_y)
                 if (distance_x < 80 and distance_y < 80 and not obj.collected):
                     # Подсказки по типу объекта
-                    if obj.object_type == "sword_in_stone":
+                    if obj.object_type in ["sword_in_stone", "trident_in_stone"]:
                         interaction_hint = "Меч: нажми E чтобы взять"
                     elif obj.object_type == "key":
                         interaction_hint = "Ключ: нажми E чтобы подобрать"
@@ -885,10 +968,14 @@ def main():
                             interaction_hint = "Дверь: нажми E чтобы открыть"
                         else:
                             interaction_hint = f"Дверь: нужно 3 ключа (у тебя {vasily.keys})"
-                    if obj.object_type == "sword_in_stone" and not vasily.has_sword and keys[pygame.K_e]:
+                    if obj.object_type in ["sword_in_stone", "trident_in_stone"] and keys[pygame.K_e]:
+                        # Подбираем оружие независимо от того, было ли оно — заменяем на трезубец/меч
                         vasily.has_sword = True
                         obj.collected = True
-                        print("Василий достал меч из камня!")
+                        if obj.object_type == "trident_in_stone":
+                            print("Василий достал трезубец из камня!")
+                        else:
+                            print("Василий достал меч из камня!")
                     elif obj.object_type == "key" and keys[pygame.K_e]:
                         vasily.keys += 1
                         obj.collected = True
@@ -899,8 +986,30 @@ def main():
                         print(f"Василий нашел кристалл! Всего кристаллов: {vasily.crystals}")
                     elif obj.object_type == "door":
                         if vasily.keys >= 3 and boss_defeated and keys[pygame.K_e]:
-                            print("Василий открыл дверь и попал на новый остров!")
-                            victory = True
+                            if current_level == 1:
+                                # Переход на уровень 2
+                                current_level = 2
+                                # Подменяем ассеты на уровень 2
+                                if background_level2:
+                                    globals()["background_far"] = background_level2
+                                if boss2_sprite:
+                                    globals()["boss_sprite"] = boss2_sprite
+                                # Сбрасываем состояние
+                                vasily.has_sword = True  # На уровне 2 сразу с оружием
+                                vasily.keys = 0
+                                vasily.crystals = 0
+                                vasily.health = vasily.max_health
+                                boss_defeated = False
+                                # Создаем сцены уровня 2
+                                scenes = create_level2_scenes()
+                                current_scene = 0
+                                vasily.x = 100
+                                vasily.y = SCREEN_HEIGHT - (hero_no_sword_sprite.get_height() if hero_no_sword_sprite else 60) - 100
+                                vasily.last_transition_time = pygame.time.get_ticks()
+                                print("Переход на уровень 2")
+                            else:
+                                print("Василий открыл дверь и завершил игру!")
+                                victory = True
                     elif obj.object_type == "boss":
                         # Обновляем босса (передаем позицию игрока для движения)
                         obj.update(vasily.x, vasily.y)
@@ -948,11 +1057,18 @@ def main():
                                 attack_x, attack_y, attack_w, attack_h = boss_attack_area
                                 
                                 # Получаем реальные размеры спрайта персонажа
-                                current_sprite_for_boss = hero_no_sword_sprite
-                                if vasily.has_sword:
-                                    current_sprite_for_boss = hero_with_sword_sprite
-                                if vasily.attacking and vasily.has_sword:
+                            if vasily.attacking and vasily.has_sword:
+                                if current_level == 2 and hero_trident_attack_sprite:
+                                    current_sprite_for_boss = hero_trident_attack_sprite
+                                else:
                                     current_sprite_for_boss = hero_attack_sprite
+                            elif vasily.has_sword:
+                                if current_level == 2 and hero_with_trident_sprite:
+                                    current_sprite_for_boss = hero_with_trident_sprite
+                                else:
+                                    current_sprite_for_boss = hero_with_sword_sprite
+                            else:
+                                current_sprite_for_boss = hero_no_sword_sprite
                                 
                                 hero_sprite_width = current_sprite_for_boss.get_width() if current_sprite_for_boss else vasily.width
                                 hero_sprite_height = current_sprite_for_boss.get_height() if current_sprite_for_boss else vasily.height
@@ -980,11 +1096,18 @@ def main():
             can_transition = current_time - vasily.last_transition_time >= 1000  # 1 секунда
             
             # Получаем реальный размер спрайта для проверки переходов
-            temp_sprite_for_transition = hero_no_sword_sprite
-            if vasily.has_sword:
-                temp_sprite_for_transition = hero_with_sword_sprite
             if vasily.attacking and vasily.has_sword:
-                temp_sprite_for_transition = hero_attack_sprite
+                if current_level == 2 and hero_trident_attack_sprite:
+                    temp_sprite_for_transition = hero_trident_attack_sprite
+                else:
+                    temp_sprite_for_transition = hero_attack_sprite
+            elif vasily.has_sword:
+                if current_level == 2 and hero_with_trident_sprite:
+                    temp_sprite_for_transition = hero_with_trident_sprite
+                else:
+                    temp_sprite_for_transition = hero_with_sword_sprite
+            else:
+                temp_sprite_for_transition = hero_no_sword_sprite
             
             transition_sprite_width = temp_sprite_for_transition.get_width() if temp_sprite_for_transition else vasily.width
             
