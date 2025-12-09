@@ -31,9 +31,9 @@ def load_image(filename, scale=1):
 background_far = load_image("assets/level_1/background/background_layer_far.png", 1.0)
 
 # Персонаж 20% по высоте экрана
-hero_no_sword_sprite = load_image("assets/characters/hero_no_sword.png", SCREEN_HEIGHT * 0.20 / 460)
+hero_no_sword_sprite = load_image("assets/characters/hero_no_weapon.png", SCREEN_HEIGHT * 0.20 / 460)
 hero_with_sword_sprite = load_image("assets/characters/hero_with_sword.png", SCREEN_HEIGHT * 0.20 / 460)
-hero_attack_sprite = load_image("assets/characters/hero_attack.png", SCREEN_HEIGHT * 0.20 / 460)
+hero_attack_sprite = load_image("assets/characters/hero_with_sword_attack.png", SCREEN_HEIGHT * 0.20 / 460)
 
 # Объекты 15% по высоте экрана (меч из level_1/weapon)
 sword_sprite = load_image("assets/level_1/weapon/sword_in_stone.png", SCREEN_HEIGHT * 0.15 / 180)
