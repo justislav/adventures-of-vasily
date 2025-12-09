@@ -629,9 +629,16 @@ class Scene:
         elif self.name == "level2_boss_scene":
             # Декоративный элемент для сцены босса уровня 2
             if boss_scene_decoration:
-                # Масштабируем под размер экрана
-                decoration_scaled = pygame.transform.scale(boss_scene_decoration, (SCREEN_WIDTH, SCREEN_HEIGHT))
-                screen.blit(decoration_scaled, (0, 0))
+                # Масштабируем до 100 пикселей по высоте, сохраняя пропорции
+                original_width = boss_scene_decoration.get_width()
+                original_height = boss_scene_decoration.get_height()
+                scale_factor = 100 / original_height
+                new_width = int(original_width * scale_factor)
+                new_height = 100
+                decoration_scaled = pygame.transform.scale(boss_scene_decoration, (new_width, new_height))
+                # Позиционируем в центре экрана по горизонтали, сверху
+                decoration_x = (SCREEN_WIDTH - new_width) // 2
+                screen.blit(decoration_scaled, (decoration_x, 0))
         
         # Рисуем объекты
         for obj in self.objects:
@@ -812,15 +819,36 @@ def main():
                     # Атака для второго игрока (X)
                     if not game_over and not victory and multiplayer_mode and vasily2:
                         vasily2.attack()
-                elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
-                    # Переключение оружия (меч <-> трезубец) только после подбора трезубца
+                elif event.key == pygame.K_RSHIFT:
+                    # Переключение оружия первого игрока (меч <-> трезубец) только после подбора трезубца
                     if not game_over and not victory and vasily.has_sword and vasily.has_trident:
                         if vasily.weapon_type == "sword":
                             vasily.weapon_type = "trident"
-                            print("Василий переключился на трезубец!")
+                            # Если мультиплеер активен, второй игрок тоже переключается
+                            if multiplayer_mode and vasily2 and vasily2.has_sword and vasily2.has_trident:
+                                vasily2.weapon_type = "trident"
+                            print("Первый игрок переключился на трезубец!")
                         elif vasily.weapon_type == "trident":
                             vasily.weapon_type = "sword"
-                            print("Василий переключился на меч!")
+                            # Если мультиплеер активен, второй игрок тоже переключается
+                            if multiplayer_mode and vasily2 and vasily2.has_sword and vasily2.has_trident:
+                                vasily2.weapon_type = "sword"
+                            print("Первый игрок переключился на меч!")
+                elif event.key == pygame.K_LSHIFT:
+                    # Переключение оружия второго игрока (меч <-> трезубец) только после подбора трезубца
+                    if not game_over and not victory and multiplayer_mode and vasily2 and vasily2.has_sword and vasily2.has_trident:
+                        if vasily2.weapon_type == "sword":
+                            vasily2.weapon_type = "trident"
+                            # Первый игрок тоже переключается
+                            if vasily.has_sword and vasily.has_trident:
+                                vasily.weapon_type = "trident"
+                            print("Второй игрок переключился на трезубец!")
+                        elif vasily2.weapon_type == "trident":
+                            vasily2.weapon_type = "sword"
+                            # Первый игрок тоже переключается
+                            if vasily.has_sword and vasily.has_trident:
+                                vasily.weapon_type = "sword"
+                            print("Второй игрок переключился на меч!")
                 elif event.key == pygame.K_r:
                     # Перезапуск игры в любое время
                     sprite_height = hero_no_sword_sprite.get_height() if hero_no_sword_sprite else 60
@@ -1169,8 +1197,10 @@ def main():
                 distance_y = abs(interaction_center_y - obj_center_y)
                 if (distance_x < 80 and distance_y < 80 and not obj.collected):
                     # Подсказки по типу объекта
-                    if obj.object_type in ["sword_in_stone", "trident_in_stone"]:
+                    if obj.object_type == "sword_in_stone":
                         interaction_hint = "Меч: нажми E чтобы взять"
+                    elif obj.object_type == "trident_in_stone":
+                        interaction_hint = "Трезубец: нажми E чтобы взять"
                     elif obj.object_type == "key":
                         interaction_hint = "Ключ: нажми E чтобы подобрать"
                     elif obj.object_type == "crystal":
@@ -1189,9 +1219,18 @@ def main():
                         if obj.object_type == "trident_in_stone":
                             vasily.weapon_type = "trident"
                             vasily.has_trident = True  # Отмечаем, что трезубец был поднят
+                            # Если мультиплеер активен, второй игрок тоже получает трезубец
+                            if multiplayer_mode and vasily2:
+                                vasily2.has_sword = True
+                                vasily2.weapon_type = "trident"
+                                vasily2.has_trident = True
                             print("Василий достал трезубец из камня!")
                         else:
                             vasily.weapon_type = "sword"
+                            # Если мультиплеер активен, второй игрок тоже получает меч
+                            if multiplayer_mode and vasily2:
+                                vasily2.has_sword = True
+                                vasily2.weapon_type = "sword"
                             print("Василий достал меч из камня!")
                     elif obj.object_type == "key" and keys[pygame.K_e]:
                         vasily.keys += 1
@@ -1235,9 +1274,16 @@ def main():
                             if obj.object_type == "trident_in_stone":
                                 vasily2.weapon_type = "trident"
                                 vasily2.has_trident = True
+                                # Первый игрок тоже получает трезубец
+                                vasily.has_sword = True
+                                vasily.weapon_type = "trident"
+                                vasily.has_trident = True
                                 print("Второй игрок достал трезубец из камня!")
                             else:
                                 vasily2.weapon_type = "sword"
+                                # Первый игрок тоже получает меч
+                                vasily.has_sword = True
+                                vasily.weapon_type = "sword"
                                 print("Второй игрок достал меч из камня!")
                         elif obj.object_type == "key" and keys[pygame.K_e]:
                             vasily.keys += 1  # Ключи общие для обоих игроков
