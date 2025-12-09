@@ -636,9 +636,10 @@ class Scene:
                 new_width = int(original_width * scale_factor)
                 new_height = 100
                 decoration_scaled = pygame.transform.scale(boss_scene_decoration, (new_width, new_height))
-                # Позиционируем в центре экрана по горизонтали, сверху
+                # Позиционируем в центре экрана по горизонтали, в самом низу экрана
                 decoration_x = (SCREEN_WIDTH - new_width) // 2
-                screen.blit(decoration_scaled, (decoration_x, 0))
+                decoration_y = SCREEN_HEIGHT - new_height
+                screen.blit(decoration_scaled, (decoration_x, decoration_y))
         
         # Рисуем объекты
         for obj in self.objects:
