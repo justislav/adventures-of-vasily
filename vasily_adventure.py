@@ -753,6 +753,8 @@ def main():
     victory = False
     boss_defeated = False  # Глобальный флаг победы над боссом
     current_level = 1  # Текущий уровень (1 или 2)
+    multiplayer_mode = False  # Режим мультиплеера
+    vasily2 = None  # Второй игрок
 
     def reshuffle_middle_scenes():
         nonlocal scenes
@@ -770,6 +772,15 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     # Выход из игры по Escape
                     running = False
+                elif event.key == pygame.K_F1:
+                    # Подключение второго игрока
+                    if not multiplayer_mode:
+                        multiplayer_mode = True
+                        sprite_height = hero_no_sword_sprite.get_height() if hero_no_sword_sprite else 60
+                        initial_y = SCREEN_HEIGHT - sprite_height - 100
+                        vasily2 = Vasily(150, initial_y)  # Второй игрок начинается немного правее
+                        vasily2.last_transition_time = pygame.time.get_ticks()
+                        print("Второй игрок подключен! Управление: стрелки + правый Shift для рывка + правая кнопка мыши для атаки")
                 elif event.key == pygame.K_F11:
                     # Переключение полноэкранного режима
                     fullscreen = not fullscreen
@@ -781,9 +792,13 @@ def main():
                         screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
                     pygame.display.set_caption("Приключения Василия - Финальная версия (F11 - полноэкранный режим)")
                 elif event.key == pygame.K_SPACE:
-                    # Рывок на пробел в сторону, куда смотрит персонаж
+                    # Рывок на пробел в сторону, куда смотрит персонаж (первый игрок)
                     if not game_over and not victory:
                         vasily.dash()
+                elif event.key == pygame.K_RSHIFT:
+                    # Рывок для второго игрока (правый Shift)
+                    if not game_over and not victory and multiplayer_mode and vasily2:
+                        vasily2.dash()
                 elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
                     # Переключение оружия (меч <-> трезубец) только после подбора трезубца
                     if not game_over and not victory and vasily.has_sword and vasily.has_trident:
@@ -806,15 +821,19 @@ def main():
                     victory = False
                     boss_defeated = False
                     current_level = 1
+                    multiplayer_mode = False  # Сбрасываем мультиплеер при перезапуске
+                    vasily2 = None
                     # Восстанавливаем ассеты уровня 1
                     background_far = load_image("assets/level_1/background/background_layer_far.png", 1.0)
                     boss_sprite = load_image("assets/level_1/boss/enemy_boss.png", SCREEN_HEIGHT * 0.40 / 540)
                     print("Игра перезапущена!")
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Левая кнопка мыши
-                    # Атака на левую кнопку мыши
+                if event.button == 1:  # Левая кнопка мыши - атака первого игрока
                     if not game_over and not victory:
                         vasily.attack()
+                elif event.button == 3:  # Правая кнопка мыши - атака второго игрока
+                    if not game_over and not victory and multiplayer_mode and vasily2:
+                        vasily2.attack()
         
         if not game_over and not victory:
             # Управление Василием
@@ -899,6 +918,76 @@ def main():
             # Обновляем Василия
             vasily.update()
             
+            # Управление вторым игроком (если мультиплеер активен)
+            if multiplayer_mode and vasily2:
+                dx2, dy2 = 0, 0
+                
+                # Управление стрелками для второго игрока
+                if keys[pygame.K_LEFT]:
+                    dx2 = -1
+                    vasily2.direction = "left"
+                if keys[pygame.K_RIGHT]:
+                    dx2 = 1
+                    vasily2.direction = "right"
+                if keys[pygame.K_UP]:
+                    dy2 = -1
+                if keys[pygame.K_DOWN]:
+                    dy2 = 1
+                
+                # Получаем спрайт для второго игрока
+                if vasily2.attacking and vasily2.has_sword:
+                    if vasily2.weapon_type == "trident" and hero_trident_attack_sprite:
+                        temp_sprite2 = hero_trident_attack_sprite
+                    else:
+                        temp_sprite2 = hero_attack_sprite
+                elif vasily2.has_sword:
+                    if vasily2.weapon_type == "trident" and hero_with_trident_sprite:
+                        temp_sprite2 = hero_with_trident_sprite
+                    else:
+                        temp_sprite2 = hero_with_sword_sprite
+                else:
+                    temp_sprite2 = hero_no_sword_sprite
+                
+                sprite_width2 = temp_sprite2.get_width() if temp_sprite2 else vasily2.width
+                sprite_height2 = temp_sprite2.get_height() if temp_sprite2 else vasily2.height
+                
+                # Обработка движения второго игрока
+                if vasily2.dashing:
+                    dash_dx2 = vasily2.dash_direction_x * vasily2.dash_speed
+                    dash_dy2 = vasily2.dash_direction_y * vasily2.dash_speed
+                    
+                    new_x2 = vasily2.x + dash_dx2
+                    new_y2 = vasily2.y + dash_dy2
+                    
+                    if new_x2 < 0:
+                        new_x2 = 0
+                    elif new_x2 > SCREEN_WIDTH + 50:
+                        new_x2 = SCREEN_WIDTH + 50
+                    
+                    max_y2 = SCREEN_HEIGHT - sprite_height2 + 100
+                    if new_y2 < -100:
+                        new_y2 = -100
+                    elif new_y2 > max_y2:
+                        new_y2 = max_y2
+                    
+                    vasily2.x = new_x2
+                    vasily2.y = new_y2
+                else:
+                    if vasily2.x + dx2 * vasily2.speed < 0:
+                        vasily2.x = 0
+                    else:
+                        new_x2 = vasily2.x + dx2 * vasily2.speed
+                        if new_x2 > SCREEN_WIDTH + 50:
+                            new_x2 = SCREEN_WIDTH + 50
+                        vasily2.x = new_x2
+                    
+                    max_y2 = SCREEN_HEIGHT - sprite_height2 + 100
+                    if -100 <= vasily2.y + dy2 * vasily2.speed <= max_y2:
+                        vasily2.y += dy2 * vasily2.speed
+                
+                vasily2.animation_frame += 1
+                vasily2.update()
+            
             # Проверка взаимодействий с объектами
             current_scene_obj = scenes[current_scene]
             interaction_hint = None  # Подсказка для взаимодействия (меч/ключ/кристалл)
@@ -923,10 +1012,10 @@ def main():
             # Сначала проверяем босса отдельно - он должен всегда обновляться и атаковать
             for obj in current_scene_obj.objects:
                 if obj.object_type == "boss":
-                    # Обновляем босса (передаем позицию игрока для движения)
+                    # Обновляем босса (передаем позицию первого игрока для движения)
                     obj.update(vasily.x, vasily.y)
                     
-                    # Проверяем атаку персонажа на босса
+                    # Проверяем атаку первого игрока на босса
                     attack_hitbox = vasily.get_attack_hitbox()
                     if attack_hitbox and vasily.attacking and not vasily.attack_damage_dealt:
                         hitbox_x, hitbox_y, hitbox_radius = attack_hitbox
@@ -995,6 +1084,62 @@ def main():
                                 else:
                                     print("Босс атаковал Василия! -15 HP")
                                 obj.attack_cooldown = 0  # Сбрасываем перезарядку, начинаем новый цикл
+                    
+                    # Проверяем атаку второго игрока на босса (если мультиплеер активен)
+                    if multiplayer_mode and vasily2:
+                        attack_hitbox2 = vasily2.get_attack_hitbox()
+                        if attack_hitbox2 and vasily2.attacking and not vasily2.attack_damage_dealt:
+                            hitbox_x2, hitbox_y2, hitbox_radius2 = attack_hitbox2
+                            boss_hitbox = obj.get_hitbox()
+                            boss_x, boss_y, boss_w, boss_h = boss_hitbox
+                            
+                            if (hitbox_x2 + hitbox_radius2 > boss_x and hitbox_x2 - hitbox_radius2 < boss_x + boss_w and
+                                hitbox_y2 + hitbox_radius2 > boss_y and hitbox_y2 - hitbox_radius2 < boss_y + boss_h):
+                                
+                                if vasily2.has_sword:
+                                    if obj.take_damage(vasily2.get_attack_damage()):
+                                        print("Босс побежден!")
+                                        current_scene_obj.completed = True
+                                        boss_defeated = True
+                                    else:
+                                        print(f"Босс получил урон от второго игрока! HP: {obj.hp}/{obj.max_hp}")
+                                    vasily2.attack_damage_dealt = True
+                                else:
+                                    vasily2.take_damage(20)
+                                    print("Второй игрок атаковал босса без меча! Получил 20 урона!")
+                                    vasily2.attack_damage_dealt = True
+                                    if vasily2.health <= 0:
+                                        game_over = True
+                    
+                    # Проверяем атаку босса на второго игрока
+                    if multiplayer_mode and vasily2 and not obj.defeated and obj.attack_cooldown >= obj.attack_interval:
+                        boss_attack_area2 = obj.get_attack_area(vasily2.x)
+                        if boss_attack_area2:
+                            attack_x2, attack_y2, attack_w2, attack_h2 = boss_attack_area2
+                            
+                            if vasily2.attacking and vasily2.has_sword:
+                                if vasily2.weapon_type == "trident" and hero_trident_attack_sprite:
+                                    current_sprite_for_boss2 = hero_trident_attack_sprite
+                                else:
+                                    current_sprite_for_boss2 = hero_attack_sprite
+                            elif vasily2.has_sword:
+                                if vasily2.weapon_type == "trident" and hero_with_trident_sprite:
+                                    current_sprite_for_boss2 = hero_with_trident_sprite
+                                else:
+                                    current_sprite_for_boss2 = hero_with_sword_sprite
+                            else:
+                                current_sprite_for_boss2 = hero_no_sword_sprite
+                            
+                            hero_sprite_width2 = current_sprite_for_boss2.get_width() if current_sprite_for_boss2 else vasily2.width
+                            hero_sprite_height2 = current_sprite_for_boss2.get_height() if current_sprite_for_boss2 else vasily2.height
+                            hero_hitbox_x2, hero_hitbox_y2, hero_hitbox_w2, hero_hitbox_h2 = vasily2.get_defense_hitbox(hero_sprite_width2, hero_sprite_height2)
+                            
+                            if (hero_hitbox_x2 < attack_x2 + attack_w2 and hero_hitbox_x2 + hero_hitbox_w2 > attack_x2 and
+                                hero_hitbox_y2 < attack_y2 + attack_h2 and hero_hitbox_y2 + hero_hitbox_h2 > attack_y2):
+                                if vasily2.take_damage(15):
+                                    game_over = True
+                                else:
+                                    print("Босс атаковал второго игрока! -15 HP")
             
             # Теперь проверяем обычные объекты (ключи, кристаллы, меч, дверь)
             for obj in current_scene_obj.objects:
@@ -1046,6 +1191,90 @@ def main():
                         vasily.crystals += 1
                         obj.collected = True
                         print(f"Василий нашел кристалл! Всего кристаллов: {vasily.crystals}")
+                
+                # Взаимодействия второго игрока с объектами
+                if multiplayer_mode and vasily2 and not obj.collected:
+                    # Получаем размеры спрайта второго игрока
+                    if vasily2.attacking and vasily2.has_sword:
+                        if vasily2.weapon_type == "trident" and hero_trident_attack_sprite:
+                            sprite2_for_interaction = hero_trident_attack_sprite
+                        else:
+                            sprite2_for_interaction = hero_attack_sprite
+                    elif vasily2.has_sword:
+                        if vasily2.weapon_type == "trident" and hero_with_trident_sprite:
+                            sprite2_for_interaction = hero_with_trident_sprite
+                        else:
+                            sprite2_for_interaction = hero_with_sword_sprite
+                    else:
+                        sprite2_for_interaction = hero_no_sword_sprite
+                    
+                    hero_sprite_width2 = sprite2_for_interaction.get_width() if sprite2_for_interaction else vasily2.width
+                    hero_sprite_height2 = sprite2_for_interaction.get_height() if sprite2_for_interaction else vasily2.height
+                    
+                    if vasily2.direction == "right":
+                        interaction_center_x2 = vasily2.x + hero_sprite_width2 + 40
+                    else:
+                        interaction_center_x2 = vasily2.x - 40
+                    interaction_center_y2 = vasily2.y + hero_sprite_height2 // 2
+                    distance_x2 = abs(interaction_center_x2 - obj_center_x)
+                    distance_y2 = abs(interaction_center_y2 - obj_center_y)
+                    if (distance_x2 < 80 and distance_y2 < 80):
+                        if obj.object_type in ["sword_in_stone", "trident_in_stone"] and keys[pygame.K_e]:
+                            vasily2.has_sword = True
+                            obj.collected = True
+                            if obj.object_type == "trident_in_stone":
+                                vasily2.weapon_type = "trident"
+                                vasily2.has_trident = True
+                                print("Второй игрок достал трезубец из камня!")
+                            else:
+                                vasily2.weapon_type = "sword"
+                                print("Второй игрок достал меч из камня!")
+                        elif obj.object_type == "key" and keys[pygame.K_e]:
+                            vasily.keys += 1  # Ключи общие для обоих игроков
+                            obj.collected = True
+                            print(f"Второй игрок нашел ключ! Всего ключей: {vasily.keys}")
+                        elif obj.object_type == "crystal" and keys[pygame.K_e]:
+                            vasily.crystals += 1  # Кристаллы общие
+                            obj.collected = True
+                            print(f"Второй игрок нашел кристалл! Всего кристаллов: {vasily.crystals}")
+                        elif obj.object_type == "door":
+                            if vasily.keys >= 3 and boss_defeated and keys[pygame.K_e]:
+                                if current_level == 1:
+                                    # Переход на уровень 2
+                                    current_level = 2
+                                    # Подменяем ассеты на уровень 2
+                                    if background_level2:
+                                        background_far = background_level2
+                                    if boss2_sprite:
+                                        boss_sprite = boss2_sprite
+                                    # Сбрасываем состояние
+                                    vasily.has_sword = True  # На уровне 2 сразу с оружием
+                                    vasily.weapon_type = "sword"  # На уровне 2 начинаем с меча
+                                    vasily.keys = 0
+                                    vasily.crystals = 0
+                                    vasily.health = vasily.max_health
+                                    if multiplayer_mode and vasily2:
+                                        vasily2.has_sword = True
+                                        vasily2.weapon_type = "sword"
+                                        vasily2.keys = 0
+                                        vasily2.crystals = 0
+                                        vasily2.health = vasily2.max_health
+                                    boss_defeated = False
+                                    # Создаем сцены уровня 2
+                                    scenes = create_level2_scenes()
+                                    current_scene = 0
+                                    vasily.x = 100
+                                    vasily.y = SCREEN_HEIGHT - (hero_no_sword_sprite.get_height() if hero_no_sword_sprite else 60) - 100
+                                    if multiplayer_mode and vasily2:
+                                        vasily2.x = 200
+                                        vasily2.y = SCREEN_HEIGHT - (hero_no_sword_sprite.get_height() if hero_no_sword_sprite else 60) - 100
+                                    vasily.last_transition_time = pygame.time.get_ticks()
+                                    if multiplayer_mode and vasily2:
+                                        vasily2.last_transition_time = pygame.time.get_ticks()
+                                    print("Переход на уровень 2")
+                                else:
+                                    print("Василий открыл дверь и завершил игру!")
+                                    victory = True
                     elif obj.object_type == "door":
                         if vasily.keys >= 3 and boss_defeated and keys[pygame.K_e]:
                             if current_level == 1:
@@ -1235,6 +1464,9 @@ def main():
         # Отрисовка
         scenes[current_scene].draw(screen)
         vasily.draw(screen)
+        # Отрисовка второго игрока (если мультиплеер активен)
+        if multiplayer_mode and vasily2:
+            vasily2.draw(screen)
         
         # Интерфейс
         font = pygame.font.Font(None, 36)
