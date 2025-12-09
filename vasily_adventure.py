@@ -65,6 +65,8 @@ background_level2 = load_image("assets/level_2/backgound/фон.png", 1.0)
 # Трезубец в камне — примерно рост персонажа (масштаб как у героя)
 trident_sprite = load_image("assets/level_2/weapon/трезубец_в_камне.png", SCREEN_HEIGHT * 0.20 / 180)
 boss2_sprite = load_image("assets/level_2/boss/boss 2 level.png", SCREEN_HEIGHT * 0.40 / 540)
+# Декоративный элемент для сцены босса уровня 2
+boss_scene_decoration = load_image("ref_level_fire/отсылка.png", 1.0)
 
 # Цвета
 WHITE = (255, 255, 255)
@@ -624,6 +626,13 @@ class Scene:
             sun_y = 100 + math.sin(self.animation_timer * 0.05) * 5
             pygame.draw.circle(screen, YELLOW, (SCREEN_WIDTH - 100, int(sun_y)), 30)
         
+        elif self.name == "level2_boss_scene":
+            # Декоративный элемент для сцены босса уровня 2
+            if boss_scene_decoration:
+                # Масштабируем под размер экрана
+                decoration_scaled = pygame.transform.scale(boss_scene_decoration, (SCREEN_WIDTH, SCREEN_HEIGHT))
+                screen.blit(decoration_scaled, (0, 0))
+        
         # Рисуем объекты
         for obj in self.objects:
             obj.draw(screen)
@@ -780,7 +789,7 @@ def main():
                         initial_y = SCREEN_HEIGHT - sprite_height - 100
                         vasily2 = Vasily(150, initial_y)  # Второй игрок начинается немного правее
                         vasily2.last_transition_time = pygame.time.get_ticks()
-                        print("Второй игрок подключен! Управление: стрелки + правый Shift для рывка + правая кнопка мыши для атаки")
+                        print("Второй игрок подключен! Управление: стрелки + Z для рывка + X для атаки")
                 elif event.key == pygame.K_F11:
                     # Переключение полноэкранного режима
                     fullscreen = not fullscreen
@@ -795,10 +804,14 @@ def main():
                     # Рывок на пробел в сторону, куда смотрит персонаж (первый игрок)
                     if not game_over and not victory:
                         vasily.dash()
-                elif event.key == pygame.K_RSHIFT:
-                    # Рывок для второго игрока (правый Shift)
+                elif event.key == pygame.K_z:
+                    # Рывок для второго игрока (Z)
                     if not game_over and not victory and multiplayer_mode and vasily2:
                         vasily2.dash()
+                elif event.key == pygame.K_x:
+                    # Атака для второго игрока (X)
+                    if not game_over and not victory and multiplayer_mode and vasily2:
+                        vasily2.attack()
                 elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
                     # Переключение оружия (меч <-> трезубец) только после подбора трезубца
                     if not game_over and not victory and vasily.has_sword and vasily.has_trident:
@@ -831,9 +844,6 @@ def main():
                 if event.button == 1:  # Левая кнопка мыши - атака первого игрока
                     if not game_over and not victory:
                         vasily.attack()
-                elif event.button == 3:  # Правая кнопка мыши - атака второго игрока
-                    if not game_over and not victory and multiplayer_mode and vasily2:
-                        vasily2.attack()
         
         if not game_over and not victory:
             # Управление первым игроком (WASD)
