@@ -736,7 +736,7 @@ def create_level2_scenes():
 
 # Основная функция игры
 def main():
-    global screen, SCREEN_WIDTH, SCREEN_HEIGHT
+    global screen, SCREEN_WIDTH, SCREEN_HEIGHT, background_far, boss_sprite, current_level
     
     clock = pygame.time.Clock()
     fullscreen = False  # Локальная переменная для полноэкранного режима
@@ -793,6 +793,23 @@ def main():
                         elif vasily.weapon_type == "trident":
                             vasily.weapon_type = "sword"
                             print("Василий переключился на меч!")
+                elif event.key == pygame.K_r:
+                    # Перезапуск игры в любое время
+                    sprite_height = hero_no_sword_sprite.get_height() if hero_no_sword_sprite else 60
+                    initial_y = SCREEN_HEIGHT - sprite_height - 100
+                    vasily = Vasily(50, initial_y)
+                    vasily.last_transition_time = pygame.time.get_ticks()
+                    scenes = create_scenes()
+                    current_scene = 0
+                    scene_timer = 0
+                    game_over = False
+                    victory = False
+                    boss_defeated = False
+                    current_level = 1
+                    # Восстанавливаем ассеты уровня 1
+                    background_far = load_image("assets/level_1/background/background_layer_far.png", 1.0)
+                    boss_sprite = load_image("assets/level_1/boss/enemy_boss.png", SCREEN_HEIGHT * 0.40 / 540)
+                    print("Игра перезапущена!")
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Левая кнопка мыши
                     # Атака на левую кнопку мыши
