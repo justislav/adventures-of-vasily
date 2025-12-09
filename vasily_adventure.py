@@ -86,6 +86,14 @@ class Vasily:
         self.attack_damage_dealt = False  # Флаг для отслеживания, был ли нанесен урон в текущей атаке
         self.attack_cooldown = 0  # Таймер перезарядки атаки
         self.attack_cooldown_duration = 30  # Длительность перезарядки (0.5 секунды при 60 FPS)
+        self.dashing = False  # Флаг рывка
+        self.dash_timer = 0  # Таймер рывка
+        self.dash_duration = 10  # Длительность рывка (10 кадров)
+        self.dash_cooldown = 0  # Таймер перезарядки рывка
+        self.dash_cooldown_duration = 60  # Длительность перезарядки рывка (1 секунда при 60 FPS)
+        self.dash_direction_x = 0  # Направление рывка по X
+        self.dash_direction_y = 0  # Направление рывка по Y
+        self.dash_speed = 15  # Скорость рывка
         self.health = 100
         self.max_health = 100
         self.invulnerable = False
@@ -184,6 +192,30 @@ class Vasily:
             self.attack_damage_dealt = False  # Сбрасываем флаг при начале новой атаки
             return True
         return False
+
+    def get_attack_damage(self):
+        """Возвращает урон атаки.
+        - 15, если атака во время рывка
+        - 11, если собрано 3 кристалла
+        - 10, по умолчанию
+        """
+        if self.dashing:
+            return 15
+        return 11 if self.crystals >= 3 else 10
+    
+    def dash(self, dx=None, dy=None):
+        """Активирует рывок в сторону, куда смотрит персонаж"""
+        if not self.dashing:
+            self.dashing = True
+            self.dash_timer = 0
+            # Рывок всегда в сторону, куда смотрит персонаж
+            if self.direction == "right":
+                self.dash_direction_x = 1  # Рывок вправо
+            else:
+                self.dash_direction_x = -1  # Рывок влево
+            self.dash_direction_y = 0  # Только горизонтальный рывок
+            return True
+        return False
     
     def get_attack_hitbox(self):
         """Возвращает координаты хитбокса атаки"""
@@ -209,6 +241,17 @@ class Vasily:
             hitbox_y = self.y + sprite_height//2   # По центру по вертикали
             return (hitbox_x, hitbox_y, 15)  # x, y, radius
         return None
+
+    def get_defense_hitbox(self, sprite_width, sprite_height):
+        """Возвращает хитбокс персонажа для получения урона, уменьшается во время рывка"""
+        if self.dashing:
+            shrink_k = 0.6  # уменьшаем хитбокс при рывке
+            new_w = sprite_width * shrink_k
+            new_h = sprite_height * shrink_k
+            offset_x = (sprite_width - new_w) / 2
+            offset_y = (sprite_height - new_h) / 2
+            return (self.x + offset_x, self.y + offset_y, new_w, new_h)
+        return (self.x, self.y, sprite_width, sprite_height)
     
     def take_damage(self, damage):
         if not self.invulnerable:
@@ -228,6 +271,13 @@ class Vasily:
                 self.attack_timer = 0
                 self.attack_damage_dealt = False  # Сбрасываем флаг при завершении атаки
                 self.attack_cooldown = self.attack_cooldown_duration  # Запускаем перезарядку после атаки
+        
+        # Обработка рывка
+        if self.dashing:
+            self.dash_timer += 1
+            if self.dash_timer >= self.dash_duration:
+                self.dashing = False
+                self.dash_timer = 0
         
         # Уменьшаем таймер перезарядки
         if self.attack_cooldown > 0:
@@ -282,7 +332,13 @@ class GameObject:
             elif self.object_type == "boss" and boss_sprite and not self.defeated:
                 # Босс больше в 2 раза (только если не побежден)
                 scaled_boss = pygame.transform.scale(boss_sprite, (self.width * 2, self.height * 2))
-                screen.blit(scaled_boss, (self.x, self.y))
+                
+                # Отражаем спрайт босса в зависимости от направления
+                display_boss = scaled_boss
+                if self.boss_direction == "left":
+                    display_boss = pygame.transform.flip(scaled_boss, True, False)
+                
+                screen.blit(display_boss, (self.x, self.y))
                 self.draw_hp_bar(screen)
                 
                 # ВИЗУАЛЬНЫЙ ДЕБАГ - хитбокс босса
@@ -290,11 +346,21 @@ class GameObject:
                 boss_x, boss_y, boss_w, boss_h = boss_hitbox
                 pygame.draw.rect(screen, RED, (boss_x, boss_y, boss_w, boss_h), 3)
                 
-                # ВИЗУАЛЬНЫЙ ДЕБАГ - зона атаки босса
-                attack_area = self.get_attack_area()
-                if attack_area:
-                    attack_x, attack_y, attack_w, attack_h = attack_area
-                    pygame.draw.rect(screen, ORANGE, (attack_x, attack_y, attack_w, attack_h), 2)
+                # ВИЗУАЛЬНЫЙ ДЕБАГ - зона атаки босса (используем текущее направление босса)
+                # Зона атаки отображается в зависимости от направления босса
+                if self.boss_direction == "right":
+                    # Зона атаки справа от босса
+                    attack_width = 150
+                    attack_x = self.x + self.width * 2
+                    attack_y = self.y
+                    attack_height = self.height * 2
+                else:
+                    # Зона атаки слева от босса
+                    attack_width = 150
+                    attack_x = self.x - 150
+                    attack_y = self.y
+                    attack_height = self.height * 2
+                pygame.draw.rect(screen, ORANGE, (attack_x, attack_y, attack_width, attack_height), 2)
             elif self.object_type == "key" and key_sprite:
                 screen.blit(key_sprite, (self.x, float_y))
                 # Свечение вокруг ключа
@@ -377,6 +443,13 @@ class GameObject:
             
             # Движение босса к игроку с задержкой
             if player_x is not None and player_y is not None:
+                # Обновляем направление босса в сторону игрока
+                boss_center_x = self.x + (self.width * 2) / 2
+                if player_x > boss_center_x:
+                    self.boss_direction = "right"  # Игрок справа - босс смотрит вправо
+                else:
+                    self.boss_direction = "left"  # Игрок слева - босс смотрит влево
+                
                 # Уменьшаем таймер задержки
                 if self.movement_delay > 0:
                     self.movement_delay -= 1
@@ -551,17 +624,17 @@ def create_scenes():
     boss_scene = Scene("boss_scene", (0, 50, 0), scenes_for_distribution[2])
     keys_scene = Scene("keys_scene", (50, 25, 0), scenes_for_distribution[3])
     
-    # Сцена 5: Открытие двери (ВСЕГДА ПОСЛЕДНЯЯ)
+    # Сцена 5: Открытие двери
     door_scene = Scene("door_scene", (135, 206, 235), [
         GameObject(SCREEN_WIDTH - 150, 306, 100, 150, BROWN, "door")  # 350 * 0.875 = 306
     ])
     
-    # Перемешиваем средние сцены случайным образом
-    middle_scenes = [obstacle_scene, boss_scene, keys_scene]
+    # Перемешиваем средние сцены случайным образом (дверь и босс могут быть в любом порядке)
+    middle_scenes = [obstacle_scene, boss_scene, keys_scene, door_scene]
     random.shuffle(middle_scenes)
     
-    # Собираем финальный список: первая сцена + перемешанные + последняя сцена
-    scenes = [sword_scene] + middle_scenes + [door_scene]
+    # Собираем финальный список: первая сцена + перемешанные
+    scenes = [sword_scene] + middle_scenes
     
     return scenes
 
@@ -582,6 +655,14 @@ def main():
     scene_duration = 300  # 5 секунд на сцену при 60 FPS
     game_over = False
     victory = False
+    boss_defeated = False  # Глобальный флаг победы над боссом
+
+    def reshuffle_middle_scenes():
+        nonlocal scenes
+        # Перетасовываем все сцены, кроме первой (меч)
+        middle = scenes[1:]
+        random.shuffle(middle)
+        scenes = [scenes[0]] + middle
     
     running = True
     while running:
@@ -603,7 +684,12 @@ def main():
                         screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
                     pygame.display.set_caption("Приключения Василия - Финальная версия (F11 - полноэкранный режим)")
                 elif event.key == pygame.K_SPACE:
-                    # Атака только при нажатии пробела (не при удержании)
+                    # Рывок на пробел в сторону, куда смотрит персонаж
+                    if not game_over and not victory:
+                        vasily.dash()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Левая кнопка мыши
+                    # Атака на левую кнопку мыши
                     if not game_over and not victory:
                         vasily.attack()
         
@@ -634,21 +720,48 @@ def main():
             sprite_width = temp_sprite.get_width() if temp_sprite else vasily.width
             sprite_height = temp_sprite.get_height() if temp_sprite else vasily.height
             
-            # Разрешаем движение за правый край для триггера перехода (но не слишком далеко)
-            # Движение происходит напрямую через move, но ограничиваем только левый край
-            if vasily.x + dx * vasily.speed < 0:
-                vasily.x = 0
-            else:
-                # Разрешаем выйти за правый край для триггера перехода (но не более чем на 50 пикселей)
-                new_x = vasily.x + dx * vasily.speed
-                if new_x > SCREEN_WIDTH + 50:
+            # Обработка движения: рывок или обычное движение
+            if vasily.dashing:
+                # Движение рывка
+                dash_dx = vasily.dash_direction_x * vasily.dash_speed
+                dash_dy = vasily.dash_direction_y * vasily.dash_speed
+                
+                # Применяем рывок с ограничениями
+                new_x = vasily.x + dash_dx
+                new_y = vasily.y + dash_dy
+                
+                # Ограничения по X
+                if new_x < 0:
+                    new_x = 0
+                elif new_x > SCREEN_WIDTH + 50:
                     new_x = SCREEN_WIDTH + 50
+                
+                # Ограничения по Y
+                max_y = SCREEN_HEIGHT - sprite_height + 100
+                if new_y < -100:
+                    new_y = -100
+                elif new_y > max_y:
+                    new_y = max_y
+                
                 vasily.x = new_x
-            
-            # Позволяем спускаться ниже - можно спуститься на 100 пикселей ниже нижнего края спрайта
-            max_y = SCREEN_HEIGHT - sprite_height + 100  # Можно спуститься чуть ниже
-            if -100 <= vasily.y + dy * vasily.speed <= max_y:
-                vasily.y += dy * vasily.speed
+                vasily.y = new_y
+            else:
+                # Обычное движение
+                # Разрешаем движение за правый край для триггера перехода (но не слишком далеко)
+                # Движение происходит напрямую через move, но ограничиваем только левый край
+                if vasily.x + dx * vasily.speed < 0:
+                    vasily.x = 0
+                else:
+                    # Разрешаем выйти за правый край для триггера перехода (но не более чем на 50 пикселей)
+                    new_x = vasily.x + dx * vasily.speed
+                    if new_x > SCREEN_WIDTH + 50:
+                        new_x = SCREEN_WIDTH + 50
+                    vasily.x = new_x
+                
+                # Позволяем спускаться ниже - можно спуститься на 100 пикселей ниже нижнего края спрайта
+                max_y = SCREEN_HEIGHT - sprite_height + 100  # Можно спуститься чуть ниже
+                if -100 <= vasily.y + dy * vasily.speed <= max_y:
+                    vasily.y += dy * vasily.speed
             
             # Обновление анимации
             vasily.animation_frame += 1
@@ -658,6 +771,7 @@ def main():
             
             # Проверка взаимодействий с объектами
             current_scene_obj = scenes[current_scene]
+            interaction_hint = None  # Подсказка для взаимодействия (меч/ключ/кристалл)
             
             # Получаем реальные размеры спрайта персонажа
             current_sprite = None
@@ -689,10 +803,11 @@ def main():
                             hitbox_y + hitbox_radius > boss_y and hitbox_y - hitbox_radius < boss_y + boss_h):
                             
                             if vasily.has_sword:
-                                # Атака с мечом - урон 10 HP (только один раз за атаку)
-                                if obj.take_damage(10):
+                                # Атака с мечом - урон зависит от собранных кристаллов (бонус +3 при 3 кристаллах)
+                                if obj.take_damage(vasily.get_attack_damage()):
                                     print("Босс побежден!")
                                     current_scene_obj.completed = True
+                                    boss_defeated = True
                                 else:
                                     print(f"Босс получил урон! HP: {obj.hp}/{obj.max_hp}")
                                 vasily.attack_damage_dealt = True  # Отмечаем, что урон нанесен
@@ -727,10 +842,11 @@ def main():
                             
                             hero_sprite_width = current_sprite_for_boss.get_width() if current_sprite_for_boss else vasily.width
                             hero_sprite_height = current_sprite_for_boss.get_height() if current_sprite_for_boss else vasily.height
+                            hero_hitbox_x, hero_hitbox_y, hero_hitbox_w, hero_hitbox_h = vasily.get_defense_hitbox(hero_sprite_width, hero_sprite_height)
                             
                             # Проверяем, находится ли персонаж в зоне атаки босса (используем РЕАЛЬНЫЕ размеры)
-                            if (vasily.x < attack_x + attack_w and vasily.x + hero_sprite_width > attack_x and
-                                vasily.y < attack_y + attack_h and vasily.y + hero_sprite_height > attack_y):
+                            if (hero_hitbox_x < attack_x + attack_w and hero_hitbox_x + hero_hitbox_w > attack_x and
+                                hero_hitbox_y < attack_y + attack_h and hero_hitbox_y + hero_hitbox_h > attack_y):
                                 # Босс атакует персонажа
                                 if vasily.take_damage(15):  # 15 урона от атаки босса
                                     game_over = True
@@ -755,6 +871,20 @@ def main():
                 distance_x = abs(interaction_center_x - obj_center_x)
                 distance_y = abs(interaction_center_y - obj_center_y)
                 if (distance_x < 80 and distance_y < 80 and not obj.collected):
+                    # Подсказки по типу объекта
+                    if obj.object_type == "sword_in_stone":
+                        interaction_hint = "Меч: нажми E чтобы взять"
+                    elif obj.object_type == "key":
+                        interaction_hint = "Ключ: нажми E чтобы подобрать"
+                    elif obj.object_type == "crystal":
+                        interaction_hint = "Кристалл: нажми E чтобы собрать"
+                    elif obj.object_type == "door":
+                        if not boss_defeated:
+                            interaction_hint = "Дверь: победи босса, потом открой (E)"
+                        elif vasily.keys >= 3:
+                            interaction_hint = "Дверь: нажми E чтобы открыть"
+                        else:
+                            interaction_hint = f"Дверь: нужно 3 ключа (у тебя {vasily.keys})"
                     if obj.object_type == "sword_in_stone" and not vasily.has_sword and keys[pygame.K_e]:
                         vasily.has_sword = True
                         obj.collected = True
@@ -767,9 +897,10 @@ def main():
                         vasily.crystals += 1
                         obj.collected = True
                         print(f"Василий нашел кристалл! Всего кристаллов: {vasily.crystals}")
-                    elif obj.object_type == "door" and vasily.keys >= 3 and keys[pygame.K_e]:
-                        print("Василий открыл дверь и попал на новый остров!")
-                        victory = True
+                    elif obj.object_type == "door":
+                        if vasily.keys >= 3 and boss_defeated and keys[pygame.K_e]:
+                            print("Василий открыл дверь и попал на новый остров!")
+                            victory = True
                     elif obj.object_type == "boss":
                         # Обновляем босса (передаем позицию игрока для движения)
                         obj.update(vasily.x, vasily.y)
@@ -786,10 +917,11 @@ def main():
                                 hitbox_y + hitbox_radius > boss_y and hitbox_y - hitbox_radius < boss_y + boss_h):
                                 
                                 if vasily.has_sword:
-                                    # Атака с мечом - урон 10 HP (только один раз за атаку)
-                                    if obj.take_damage(10):
+                                    # Атака с мечом - урон зависит от собранных кристаллов (бонус +3 при 3 кристаллах)
+                                    if obj.take_damage(vasily.get_attack_damage()):
                                         print("Босс побежден!")
                                         current_scene_obj.completed = True
+                                        boss_defeated = True
                                     else:
                                         print(f"Босс получил урон! HP: {obj.hp}/{obj.max_hp}")
                                     vasily.attack_damage_dealt = True  # Отмечаем, что урон нанесен
@@ -824,10 +956,11 @@ def main():
                                 
                                 hero_sprite_width = current_sprite_for_boss.get_width() if current_sprite_for_boss else vasily.width
                                 hero_sprite_height = current_sprite_for_boss.get_height() if current_sprite_for_boss else vasily.height
+                                hero_hitbox_x, hero_hitbox_y, hero_hitbox_w, hero_hitbox_h = vasily.get_defense_hitbox(hero_sprite_width, hero_sprite_height)
                                 
                                 # Проверяем, находится ли персонаж в зоне атаки босса (используем РЕАЛЬНЫЕ размеры)
-                                if (vasily.x < attack_x + attack_w and vasily.x + hero_sprite_width > attack_x and
-                                    vasily.y < attack_y + attack_h and vasily.y + hero_sprite_height > attack_y):
+                                if (hero_hitbox_x < attack_x + attack_w and hero_hitbox_x + hero_hitbox_w > attack_x and
+                                    hero_hitbox_y < attack_y + attack_h and hero_hitbox_y + hero_hitbox_h > attack_y):
                                     # Босс атакует персонажа
                                     if vasily.take_damage(15):  # 15 урона от атаки босса
                                         game_over = True
@@ -864,19 +997,12 @@ def main():
             elif current_scene_obj.name == "boss_scene":
                 # В сцене босса можно перейти только после победы
                 can_advance = current_scene_obj.completed and can_transition and at_right_edge
-            elif current_scene_obj.name == "door_scene":
-                # Из сцены двери вперед переходим на сцену меча (круг)
-                can_advance = at_right_edge and can_transition
             else:
-                # obstacle_scene, keys_scene
+                # obstacle_scene, keys_scene, door_scene (дверь может быть в любой сцене)
                 can_advance = at_right_edge and can_transition
             
             if can_advance:
-                # Особая логика перехода из сцены двери: на сцену меча
-                if current_scene_obj.name == "door_scene":
-                    current_scene = 0
-                else:
-                    current_scene = (current_scene + 1) % len(scenes)
+                current_scene = (current_scene + 1) % len(scenes)
                 scene_timer = 0
                 sprite_height_for_transition = hero_no_sword_sprite.get_height() if hero_no_sword_sprite else 60
                 # Появляется слева, но подальше от края чтобы не было бесконечного перехода
@@ -884,6 +1010,11 @@ def main():
                 vasily.y = SCREEN_HEIGHT - sprite_height_for_transition - 100  # Правильная позиция
                 vasily.current_scene = current_scene
                 vasily.last_transition_time = current_time
+                # Если пришли в сцену с дверью - перемешиваем комнаты снова
+                if scenes[current_scene].name == "door_scene":
+                    reshuffle_middle_scenes()
+                    # Обновляем индекс двери после перемешивания, чтобы остаться в текущей комнате
+                    current_scene = next((i for i, sc in enumerate(scenes) if sc.name == "door_scene"), current_scene)
                 print(f"Переход к сцене: {scenes[current_scene].name}")
             
             # Проверяем переход к предыдущей сцене (левый край) - автоматический без клавиш
@@ -896,7 +1027,7 @@ def main():
                 # Из босса назад можно только после победы
                 can_go_back = current_scene_obj.completed and at_left_edge and can_transition
             else:
-                # В остальных сценах - автоматический переход при достижении левого края
+                # В остальных сценах (включая door_scene) - автоматический переход при достижении левого края
                 can_go_back = at_left_edge and can_transition
             
             if can_go_back:
@@ -908,6 +1039,11 @@ def main():
                 vasily.y = SCREEN_HEIGHT - sprite_height_for_transition - 100  # Правильная позиция
                 vasily.current_scene = current_scene
                 vasily.last_transition_time = current_time
+                # Если пришли в сцену с дверью - перемешиваем комнаты снова
+                if scenes[current_scene].name == "door_scene":
+                    reshuffle_middle_scenes()
+                    # Обновляем индекс двери после перемешивания, чтобы остаться в текущей комнате
+                    current_scene = next((i for i, sc in enumerate(scenes) if sc.name == "door_scene"), current_scene)
                 print(f"Переход к предыдущей сцене: {scenes[current_scene].name}")
         
         # Отрисовка
@@ -933,8 +1069,26 @@ def main():
         screen.blit(crystals_text, (10, 130))
         
         # Инструкции
-        instruction_text = font.render("WASD - движение, SPACE - атака (только с мечом), E - взаимодействие", True, BLACK)
+        instruction_text = font.render("WASD - движение, ЛКМ - атака (только с мечом), E - взаимодействие, SPACE - рывок", True, BLACK)
         screen.blit(instruction_text, (10, SCREEN_HEIGHT - 60))
+
+        # Крупный шрифт для подсказок
+        hint_font = pygame.font.Font(None, 48)
+        
+        # Подсказка для боя с боссом
+        if current_scene_obj.name == "boss_scene":
+            # Находим босса в текущей сцене
+            boss_obj = next((o for o in current_scene_obj.objects if o.object_type == "boss"), None)
+            if boss_obj and not boss_obj.defeated:
+                boss_hint = hint_font.render("ЛКМ — атакуй босса мечом", True, RED)
+                boss_hint_rect = boss_hint.get_rect(center=(SCREEN_WIDTH // 2, 40))
+                screen.blit(boss_hint, boss_hint_rect)
+
+        # Подсказка для взаимодействия (меч/ключ/кристалл)
+        if interaction_hint:
+            hint_text = hint_font.render(interaction_hint, True, ORANGE)
+            hint_rect = hint_text.get_rect(center=(SCREEN_WIDTH // 2, 70))
+            screen.blit(hint_text, hint_rect)
         
         f11_hint_text = font.render("F11 - переключить полноэкранный режим", True, BLACK)
         screen.blit(f11_hint_text, (10, SCREEN_HEIGHT - 30))
@@ -957,7 +1111,7 @@ def main():
                 if current_scene_obj.name == "boss_scene":
                     if not current_scene_obj.completed:
                         # Босс не побежден
-                        message_text = font.render("Победите босса мечом! (SPACE)", True, RED)
+                        message_text = font.render("Победите босса мечом! (ЛКМ)", True, RED)
                         message_rect = message_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT - 60))
                         screen.blit(message_text, message_rect)
                 elif current_scene_obj.name == "door_scene":
