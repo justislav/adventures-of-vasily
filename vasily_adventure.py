@@ -495,30 +495,61 @@ def create_scenes():
     # Все объекты спавнятся в средней части экрана, не слишком низко и не слева
     # Объекты Y позиция: примерно на высоте 350-394 (средняя треть экрана, скорректировано для SCREEN_HEIGHT=700)
     
-    # Сцена 1: Доставание меча из камня + первый ключ + первый кристалл (ВСЕГДА ПЕРВАЯ)
-    sword_scene = Scene("sword_scene", (34, 139, 34), [
-        GameObject(SCREEN_WIDTH//2 - 50, 350, 100, 100, GRAY, "sword_in_stone"),  # 400 * 0.875 = 350
-        GameObject(300, 394, 30, 30, YELLOW, "key"),  # 450 * 0.875 = 394
-        GameObject(800, 350, 30, 30, PURPLE, "crystal", crystal_type=0)  # Первый кристалл
-    ])
+    # Создаем все ключи и кристаллы с разными позициями
+    key_positions = [
+        (300, 394),  # Позиция 1
+        (600, 394),  # Позиция 2
+        (150, 394)   # Позиция 3
+    ]
     
-    # Сцена 2: Преодоление препятствий + второй ключ + второй кристалл
-    obstacle_scene = Scene("obstacle_scene", (135, 206, 235), [
-        GameObject(600, 394, 30, 30, YELLOW, "key"),  # 450 * 0.875 = 394
-        GameObject(900, 350, 30, 30, PURPLE, "crystal", crystal_type=1)  # Второй кристалл
-    ])
+    crystal_positions = [
+        (800, 350),  # Позиция 1
+        (900, 350),  # Позиция 2
+        (400, 350)   # Позиция 3
+    ]
     
-    # Сцена 3: Бой с боссом + третий ключ + третий кристалл
-    boss_scene = Scene("boss_scene", (0, 50, 0), [
-        GameObject(int(SCREEN_WIDTH * 2/3), SCREEN_HEIGHT - 263, 150, 200, GREEN, "boss"),  # (SCREEN_HEIGHT - 300) * 0.875 = SCREEN_HEIGHT - 263
-        GameObject(150, 394, 30, 30, YELLOW, "key"),  # 450 * 0.875 = 394
-        GameObject(400, 350, 30, 30, PURPLE, "crystal", crystal_type=2)  # Третий кристалл
-    ])
+    # Создаем базовые сцены
+    # Сцена 1: Доставание меча из камня (ВСЕГДА ПЕРВАЯ)
+    sword_scene_objects = [
+        GameObject(SCREEN_WIDTH//2 - 50, 350, 100, 100, GRAY, "sword_in_stone")  # Меч всегда в первой сцене
+    ]
     
-    # Сцена 4: Поиск кристаллов (без ключей и кристаллов - они теперь в других сценах)
-    keys_scene = Scene("keys_scene", (50, 25, 0), [
-        # Кристаллы теперь распределены по другим сценам
-    ])
+    # Сцена 2: Преодоление препятствий
+    obstacle_scene_objects = []
+    
+    # Сцена 3: Бой с боссом
+    boss_scene_objects = [
+        GameObject(int(SCREEN_WIDTH * 2/3), SCREEN_HEIGHT - 263, 150, 200, GREEN, "boss")  # Босс всегда в boss_scene
+    ]
+    
+    # Сцена 4: Поиск кристаллов
+    keys_scene_objects = []
+    
+    # Список всех сцен для распределения (sword_scene + 3 средние)
+    scenes_for_distribution = [
+        sword_scene_objects,
+        obstacle_scene_objects,
+        boss_scene_objects,
+        keys_scene_objects
+    ]
+    
+    # Случайно распределяем 3 ключа по 4 сценам
+    key_scene_indices = random.sample(range(4), 3)  # Выбираем 3 случайные сцены из 4
+    for i, scene_idx in enumerate(key_scene_indices):
+        x, y = key_positions[i]
+        scenes_for_distribution[scene_idx].append(GameObject(x, y, 30, 30, YELLOW, "key"))
+    
+    # Случайно распределяем 3 кристалла по 4 сценам
+    crystal_scene_indices = random.sample(range(4), 3)  # Выбираем 3 случайные сцены из 4
+    for i, scene_idx in enumerate(crystal_scene_indices):
+        x, y = crystal_positions[i]
+        scenes_for_distribution[scene_idx].append(GameObject(x, y, 30, 30, PURPLE, "crystal", crystal_type=i))
+    
+    # Создаем объекты сцен
+    sword_scene = Scene("sword_scene", (34, 139, 34), scenes_for_distribution[0])
+    obstacle_scene = Scene("obstacle_scene", (135, 206, 235), scenes_for_distribution[1])
+    boss_scene = Scene("boss_scene", (0, 50, 0), scenes_for_distribution[2])
+    keys_scene = Scene("keys_scene", (50, 25, 0), scenes_for_distribution[3])
     
     # Сцена 5: Открытие двери (ВСЕГДА ПОСЛЕДНЯЯ)
     door_scene = Scene("door_scene", (135, 206, 235), [
