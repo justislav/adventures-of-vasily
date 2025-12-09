@@ -1477,6 +1477,18 @@ def main():
         # Отрисовка второго игрока (если мультиплеер активен)
         if multiplayer_mode and vasily2:
             vasily2.draw(screen)
+            # Визуальное отображение оружия второго игрока (если есть)
+            if vasily2.has_sword:
+                weapon_x = vasily2.x + (vasily2.width if vasily2.direction == "right" else -30)
+                weapon_y = vasily2.y - 30
+                if vasily2.weapon_type == "sword" and sword_sprite:
+                    # Отображаем меч над вторым игроком
+                    scaled_sword = pygame.transform.scale(sword_sprite, (30, 30))
+                    screen.blit(scaled_sword, (weapon_x, weapon_y))
+                elif vasily2.weapon_type == "trident" and trident_sprite:
+                    # Отображаем трезубец над вторым игроком
+                    scaled_trident = pygame.transform.scale(trident_sprite, (30, 30))
+                    screen.blit(scaled_trident, (weapon_x, weapon_y))
         
         # Интерфейс
         font = pygame.font.Font(None, 36)
@@ -1489,6 +1501,19 @@ def main():
         else:
             sword_text = font.render("Меч: ✗", True, RED)
             screen.blit(sword_text, (10, 50))
+        
+        # Отображение оружия второго игрока (если мультиплеер активен)
+        if multiplayer_mode and vasily2:
+            if vasily2.has_sword:
+                if vasily2.weapon_type == "sword":
+                    sword2_text = font.render("Меч 2: ✓", True, BLACK)
+                    screen.blit(sword2_text, (10, 170))
+                elif vasily2.weapon_type == "trident":
+                    trident2_text = font.render("Трезубец 2: ✓", True, BLACK)
+                    screen.blit(trident2_text, (10, 170))
+            else:
+                sword2_text = font.render("Меч 2: ✗", True, RED)
+                screen.blit(sword2_text, (10, 170))
         
         keys_text = font.render(f"Ключи: {vasily.keys}/3", True, BLACK)
         screen.blit(keys_text, (10, 90))
