@@ -772,7 +772,7 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     # Выход из игры по Escape
                     running = False
-                elif event.key == pygame.K_F1:
+                elif event.key == pygame.K_0:
                     # Подключение второго игрока
                     if not multiplayer_mode:
                         multiplayer_mode = True
@@ -836,19 +836,19 @@ def main():
                         vasily2.attack()
         
         if not game_over and not victory:
-            # Управление Василием
+            # Управление первым игроком (WASD)
             keys = pygame.key.get_pressed()
             dx, dy = 0, 0
             
-            if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            if keys[pygame.K_a]:
                 dx = -1
                 vasily.direction = "left"  # Поворачиваемся влево
-            if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            if keys[pygame.K_d]:
                 dx = 1
                 vasily.direction = "right"  # Поворачиваемся вправо
-            if keys[pygame.K_UP] or keys[pygame.K_w]:
+            if keys[pygame.K_w]:
                 dy = -1
-            if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+            if keys[pygame.K_s]:
                 dy = 1
             
             # Ограничение движения в пределах экрана (используем реальные размеры спрайта)
