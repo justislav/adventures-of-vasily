@@ -88,6 +88,7 @@ class Vasily:
         self.height = 60
         self.speed = 4
         self.has_sword = False
+        self.has_trident = False  # Флаг, был ли поднят трезубец
         self.keys = 0
         self.crystals = 0
         self.animation_frame = 0
@@ -784,8 +785,8 @@ def main():
                     if not game_over and not victory:
                         vasily.dash()
                 elif event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
-                    # Переключение оружия (меч <-> трезубец)
-                    if not game_over and not victory and vasily.has_sword:
+                    # Переключение оружия (меч <-> трезубец) только после подбора трезубца
+                    if not game_over and not victory and vasily.has_sword and vasily.has_trident:
                         if vasily.weapon_type == "sword":
                             vasily.weapon_type = "trident"
                             print("Василий переключился на трезубец!")
@@ -1015,6 +1016,7 @@ def main():
                         obj.collected = True
                         if obj.object_type == "trident_in_stone":
                             vasily.weapon_type = "trident"
+                            vasily.has_trident = True  # Отмечаем, что трезубец был поднят
                             print("Василий достал трезубец из камня!")
                         else:
                             vasily.weapon_type = "sword"
