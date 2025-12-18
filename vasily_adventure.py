@@ -1207,12 +1207,14 @@ def main():
                     elif obj.object_type == "crystal":
                         interaction_hint = "Кристалл: нажми E чтобы собрать"
                     elif obj.object_type == "door":
-                        if not boss_defeated:
+                        if not boss_defeated and vasily.keys < 3:
+                            interaction_hint = "Дверь: победи босса и собери 3 ключа"
+                        elif not boss_defeated:
                             interaction_hint = "Дверь: победи босса, потом открой (E)"
-                        elif vasily.keys >= 3:
-                            interaction_hint = "Дверь: нажми E чтобы открыть"
-                        else:
+                        elif vasily.keys < 3:
                             interaction_hint = f"Дверь: нужно 3 ключа (у тебя {vasily.keys})"
+                        else:
+                            interaction_hint = "Дверь: нажми E чтобы открыть"
                     if obj.object_type in ["sword_in_stone", "trident_in_stone"] and keys[pygame.K_e]:
                         # Подбираем оружие независимо от того, было ли оно — заменяем на трезубец/меч
                         vasily.has_sword = True
