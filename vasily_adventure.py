@@ -706,17 +706,17 @@ def create_scenes():
     boss_scene = Scene("boss_scene", (0, 50, 0), scenes_for_distribution[2])
     keys_scene = Scene("keys_scene", (50, 25, 0), scenes_for_distribution[3])
     
-    # Сцена 5: Открытие двери
+    # Сцена двери (ВСЕГДА ПОСЛЕДНЯЯ)
     door_scene = Scene("door_scene", (135, 206, 235), [
         GameObject(SCREEN_WIDTH - 150, 306, 100, 150, BROWN, "door")  # 350 * 0.875 = 306
     ])
     
-    # Перемешиваем средние сцены случайным образом (дверь и босс могут быть в любом порядке)
-    middle_scenes = [obstacle_scene, boss_scene, keys_scene, door_scene]
+    # Перемешиваем только средние сцены (obstacle, boss, keys) - дверь всегда последняя
+    middle_scenes = [obstacle_scene, boss_scene, keys_scene]
     random.shuffle(middle_scenes)
     
-    # Собираем финальный список: первая сцена + перемешанные
-    scenes = [sword_scene] + middle_scenes
+    # Собираем финальный список: первая сцена + перемешанные средние + дверь (всегда последняя)
+    scenes = [sword_scene] + middle_scenes + [door_scene]
     
     return scenes
 
@@ -793,10 +793,12 @@ def main():
 
     def reshuffle_middle_scenes():
         nonlocal scenes
-        # Перетасовываем все сцены, кроме первой (меч)
-        middle = scenes[1:]
-        random.shuffle(middle)
-        scenes = [scenes[0]] + middle
+        # Перетасовываем только средние сцены (obstacle, boss, keys)
+        # Первая сцена (sword_scene) и последняя (door_scene) остаются на своих местах
+        if len(scenes) > 2:
+            middle = scenes[1:-1]  # Все сцены кроме первой и последней
+            random.shuffle(middle)
+            scenes = [scenes[0]] + middle + [scenes[-1]]  # Первая + перемешанные + последняя
     
     running = True
     while running:
