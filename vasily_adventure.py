@@ -762,14 +762,32 @@ def main():
     initial_y = SCREEN_HEIGHT - sprite_height - 100  # На 100 пикселей выше низа экрана
     vasily = Vasily(50, initial_y)
     vasily.last_transition_time = pygame.time.get_ticks()  # Инициализируем время последнего перехода
-    scenes = create_scenes()
+    
+    # Старт сразу с уровня 2
+    current_level = 2
+    scenes = create_level2_scenes()
     current_scene = 0
+    # Подменяем ассеты под уровень 2
+    if background_level2:
+        background_far = background_level2
+    if boss2_sprite:
+        boss_sprite = boss2_sprite
+    # Стартовое состояние игрока на уровне 2
+    vasily.has_sword = True
+    vasily.weapon_type = "sword"
+    vasily.has_trident = False
+    vasily.keys = 0
+    vasily.crystals = 0
+    boss_defeated = False
+    # Позиция на уровне 2
+    vasily.x = 50
+    vasily.y = SCREEN_HEIGHT - sprite_height - 100
+    
     scene_timer = 0
     scene_duration = 300  # 5 секунд на сцену при 60 FPS
     game_over = False
     victory = False
-    boss_defeated = False  # Глобальный флаг победы над боссом
-    current_level = 1  # Текущий уровень (1 или 2)
+    # boss_defeated уже установлен выше
     multiplayer_mode = False  # Режим мультиплеера
     vasily2 = None  # Второй игрок
 
@@ -782,6 +800,7 @@ def main():
     
     running = True
     while running:
+        q_pressed = False  # Флаг нажатия Q в этом кадре
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -820,6 +839,9 @@ def main():
                     # Атака для второго игрока (X)
                     if not game_over and not victory and multiplayer_mode and vasily2:
                         vasily2.attack()
+                elif event.key == pygame.K_q:
+                    # Запоминаем нажатие Q для двери
+                    q_pressed = True
                 elif event.key == pygame.K_RSHIFT:
                     # Переключение оружия первого игрока (меч <-> трезубец) только после подбора трезубца
                     if not game_over and not victory and vasily.has_sword and vasily.has_trident:
@@ -1210,11 +1232,11 @@ def main():
                         if not boss_defeated and vasily.keys < 3:
                             interaction_hint = "Дверь: победи босса и собери 3 ключа"
                         elif not boss_defeated:
-                            interaction_hint = "Дверь: победи босса, потом открой (E)"
+                            interaction_hint = "Дверь: победи босса, потом открой (Q)"
                         elif vasily.keys < 3:
                             interaction_hint = f"Дверь: нужно 3 ключа (у тебя {vasily.keys})"
                         else:
-                            interaction_hint = "Дверь: нажми E чтобы открыть"
+                            interaction_hint = "Дверь: нажми Q чтобы открыть"
                     if obj.object_type in ["sword_in_stone", "trident_in_stone"] and keys[pygame.K_e]:
                         # Подбираем оружие независимо от того, было ли оно — заменяем на трезубец/меч
                         vasily.has_sword = True
@@ -1297,7 +1319,7 @@ def main():
                             obj.collected = True
                             print(f"Второй игрок нашел кристалл! Всего кристаллов: {vasily.crystals}")
                         elif obj.object_type == "door":
-                            if vasily.keys >= 3 and boss_defeated and keys[pygame.K_e]:
+                            if vasily.keys >= 3 and boss_defeated and keys[pygame.K_q]:
                                 if current_level == 1:
                                     # Переход на уровень 2
                                     current_level = 2
@@ -1335,7 +1357,7 @@ def main():
                                     print("Василий открыл дверь и завершил игру!")
                                     victory = True
                     elif obj.object_type == "door":
-                        if vasily.keys >= 3 and boss_defeated and keys[pygame.K_e]:
+                        if vasily.keys >= 3 and boss_defeated and (keys[pygame.K_q] or q_pressed):
                             if current_level == 1:
                                 # Переход на уровень 2
                                 current_level = 2
