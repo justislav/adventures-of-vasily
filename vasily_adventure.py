@@ -78,6 +78,8 @@ else:
 shop_sprite = load_image("assets/level_2/shop.png", 1.0)
 # Монета уровня 2 (+1 к деньгам за штуку)
 coin_sprite = load_image("assets/level_2/coin.png", SCREEN_HEIGHT * 0.12 / 200)
+# Лава (лужи на уровне 2 — 5 урона, пока не выйдешь)
+lava_sprite = load_image("assets/level_2/lava_lake.png", 1.0)
 
 # Цвета
 WHITE = (255, 255, 255)
@@ -92,6 +94,14 @@ PURPLE = (128, 0, 128)
 ORANGE = (255, 165, 0)
 CYAN = (0, 255, 255)
 
+# Бомба (магазин уровня 2)
+BOMB_PRICE = 10
+BOMB_DAMAGE = 30
+BOMB_EXPLOSION_RADIUS = 150
+# Лава на уровне 2
+LAVA_DAMAGE = 5
+LAVA_DAMAGE_INTERVAL = 60  # кадров между тиками урона (~1 сек)
+
 # Класс для персонажа Василия
 class Vasily:
     def __init__(self, x, y):
@@ -105,6 +115,7 @@ class Vasily:
         self.keys = 0
         self.crystals = 0
         self.money = 0  # Деньги (монеты) для магазина
+        self.bombs = 0  # Бомбы (покупка в магазине, F — бросить, 30 урона по области)
         self.animation_frame = 0
         self.attacking = False
         self.attack_timer = 0
@@ -381,8 +392,15 @@ class GameObject:
         self.color = color
         self.object_type = object_type
         self.collected = False
-        self.hp = 50 if object_type == "boss" else 1
-        self.max_hp = 50 if object_type == "boss" else 1
+        if object_type == "boss":
+            self.hp = 50
+            self.max_hp = 50
+        elif object_type == "worm":
+            self.hp = 20
+            self.max_hp = 20
+        else:
+            self.hp = 1
+            self.max_hp = 1
         self.animation_timer = 0
         self.original_y = y
         self.crystal_type = crystal_type  # Для фиксированного типа кристалла
@@ -394,7 +412,9 @@ class GameObject:
         self.target_y = y  # Целевая позиция Y для босса
         self.movement_delay = 30  # Таймер задержки движения (0.5 секунды = 30 кадров) - начинаем с задержкой
         self.movement_delay_duration = 30  # Длительность задержки движения
-        self.boss_direction = "left"  # Направление босса: "left" или "right"
+        self.boss_direction = "left"  # Направление босса/червя: "left" или "right"
+        self.worm_speed = 1.2  # Скорость червя (уровень 1)
+        self.worm_attack_interval = 90  # Интервал атаки червя (1.5 сек при 60 FPS)
         
     def draw(self, screen):
         if not self.collected:
@@ -460,14 +480,19 @@ class GameObject:
                 pygame.draw.circle(screen, YELLOW, (self.x + 15, int(float_y) + 15), 18, 2)
             elif self.object_type == "bush" and bush_sprite:
                 screen.blit(bush_sprite, (self.x, self.y))
-            elif self.object_type == "worm" and worm_sprite:
-                screen.blit(worm_sprite, (self.x, self.y))
+            elif self.object_type == "worm" and worm_sprite and not self.defeated:
+                display_worm = pygame.transform.flip(worm_sprite, self.boss_direction == "left", False)
+                screen.blit(display_worm, (self.x, self.y))
+                self.draw_worm_hp_bar(screen)
             elif self.object_type == "flying_creature" and flying_creature_sprite:
                 screen.blit(flying_creature_sprite, (self.x, self.y))
             elif self.object_type == "enemy_flying_creature" and enemy_flying_creature_sprite:
                 screen.blit(enemy_flying_creature_sprite, (self.x, self.y))
             elif self.object_type == "flipping_creature" and flipping_creature_sprite:
                 screen.blit(flipping_creature_sprite, (self.x, self.y))
+            elif self.object_type == "lava" and lava_sprite:
+                scaled = pygame.transform.scale(lava_sprite, (self.width, self.height))
+                screen.blit(scaled, (self.x, self.y))
             
             # ВИЗУАЛЬНЫЙ ДЕБАГ - зона взаимодействия для объектов
             if self.object_type in ["sword_in_stone", "trident_in_stone", "key", "crystal", "coin", "door"]:
@@ -499,9 +524,22 @@ class GameObject:
             hp_text = font.render(f"BOSS HP: {self.hp}/{self.max_hp}", True, WHITE)
             screen.blit(hp_text, (bar_x, bar_y - 20))
     
+    def draw_worm_hp_bar(self, screen):
+        """Полоска здоровья червя (20 HP)"""
+        if self.object_type == "worm" and not self.defeated:
+            bar_width = 40
+            bar_height = 6
+            bar_x = self.x + (self.width - bar_width) // 2
+            bar_y = self.y - 10
+            pygame.draw.rect(screen, RED, (bar_x, bar_y, bar_width, bar_height))
+            current_width = max(0, int((self.hp / self.max_hp) * bar_width))
+            if current_width > 0:
+                pygame.draw.rect(screen, GREEN, (bar_x, bar_y, current_width, bar_height))
+            pygame.draw.rect(screen, BLACK, (bar_x, bar_y, bar_width, bar_height), 1)
+    
     def take_damage(self, damage=1):
         """Наносит урон объекту"""
-        if self.object_type == "boss":
+        if self.object_type in ("boss", "worm"):
             self.hp -= damage
             if self.hp <= 0:
                 self.collected = True
@@ -512,7 +550,6 @@ class GameObject:
     def get_hitbox(self):
         """Возвращает хитбокс объекта для проверки столкновений"""
         if self.object_type == "boss":
-            # Босс больше в 2 раза чем персонаж (по высоте в 2 раза больше)
             return (self.x, self.y, self.width * 2, self.height * 2)
         return (self.x, self.y, self.width, self.height)
     
@@ -551,6 +588,23 @@ class GameObject:
                         # Двигаемся к игроку
                         self.x += dx * self.boss_speed
                         self.y += dy * self.boss_speed
+        
+        elif self.object_type == "worm" and not self.defeated:
+            if self.attack_cooldown < self.worm_attack_interval:
+                self.attack_cooldown += 1
+            if player_x is not None and player_y is not None:
+                worm_center_x = self.x + self.width / 2
+                self.boss_direction = "right" if player_x > worm_center_x else "left"
+                dx = player_x - self.x
+                dy = player_y - self.y
+                distance = math.sqrt(dx * dx + dy * dy)
+                if distance > 8 and distance < 400:
+                    if distance > 0:
+                        dx, dy = dx / distance, dy / distance
+                    self.x += dx * self.worm_speed
+                    self.y += dy * self.worm_speed
+                    self.x = max(0, min(SCREEN_WIDTH - self.width, self.x))
+                    self.y = max(0, min(SCREEN_HEIGHT - self.height, self.y))
     
     def get_attack_area(self, player_x=None):
         """Возвращает зону атаки босса (направлена в сторону игрока - только одна сторона)"""
@@ -582,6 +636,12 @@ class GameObject:
                 attack_y = self.y
                 attack_height = self.height * 2
                 return (attack_x, attack_y, attack_width, attack_height)
+        if self.object_type == "worm" and not self.defeated:
+            attack_width = 50
+            attack_height = self.height
+            if getattr(self, 'boss_direction', 'left') == "right":
+                return (self.x + self.width, self.y, attack_width, attack_height)
+            return (self.x - attack_width, self.y, attack_width, attack_height)
         return None
 
 # Класс для сцены
@@ -611,10 +671,8 @@ class Scene:
                     screen.blit(bush_sprite, (i, SCREEN_HEIGHT - 175 + sway_offset))  # 200 * 0.875 = 175
             
         elif self.name == "obstacle_scene":
-            # Добавляем червей как препятствия
-            if worm_sprite:
-                for i in range(200, SCREEN_WIDTH, 300):
-                    screen.blit(worm_sprite, (i, SCREEN_HEIGHT - 175))  # 200 * 0.875 = 175
+            # Черви добавлены как GameObject с 20 HP (рисуются в obj.draw)
+            pass
                 
         elif self.name == "boss_scene":
             # Темный эффект для боя с мерцанием (только если босс не побежден)
@@ -690,8 +748,13 @@ def create_scenes():
         GameObject(SCREEN_WIDTH//2 - 50, 350, 100, 100, GRAY, "sword_in_stone")  # Меч всегда в первой сцене
     ]
     
-    # Сцена 2: Преодоление препятствий
-    obstacle_scene_objects = []
+    # Сцена 2: Преодоление препятствий — черви-враги (20 HP), атакуют игрока
+    worm_y = SCREEN_HEIGHT - 205  # У земли, как декоративные черви
+    obstacle_scene_objects = [
+        GameObject(220, worm_y, 40, 30, (100, 60, 40), "worm"),
+        GameObject(520, worm_y, 40, 30, (100, 60, 40), "worm"),
+        GameObject(820, worm_y, 40, 30, (100, 60, 40), "worm"),
+    ]
     
     # Сцена 3: Бой с боссом
     boss_scene_objects = [
@@ -745,12 +808,16 @@ def create_scenes():
 def create_level2_scenes():
     scenes = []
     # Сцена 1 уровня 2: трезубец + ключ + кристалл
+    ground_y = SCREEN_HEIGHT - 70
     scene1 = Scene("level2_weapon_scene", (34, 139, 34), [
         GameObject(SCREEN_WIDTH//2 - 50, 350, 100, 100, GRAY, "trident_in_stone"),  # трезубец в камне
         GameObject(300, 394, 30, 30, YELLOW, "key"),
         GameObject(800, 350, 30, 30, PURPLE, "crystal", crystal_type=0),
         GameObject(500, 380, 30, 30, YELLOW, "coin"),
-        GameObject(1100, 360, 30, 30, YELLOW, "coin")
+        GameObject(1100, 360, 30, 30, YELLOW, "coin"),
+        GameObject(80, ground_y - 20, 220, 100, ORANGE, "lava"),
+        GameObject(400, ground_y - 20, 220, 100, ORANGE, "lava"),
+        GameObject(720, ground_y - 20, 220, 100, ORANGE, "lava"),
     ])
     scenes.append(scene1)
     
@@ -759,7 +826,9 @@ def create_level2_scenes():
         GameObject(200, 394, 30, 30, YELLOW, "key"),
         GameObject(1000, 360, 30, 30, PURPLE, "crystal", crystal_type=0),
         GameObject(400, 370, 30, 30, YELLOW, "coin"),
-        GameObject(700, 380, 30, 30, YELLOW, "coin")
+        GameObject(700, 380, 30, 30, YELLOW, "coin"),
+        GameObject(320, ground_y - 20, 260, 100, ORANGE, "lava"),
+        GameObject(640, ground_y - 20, 260, 100, ORANGE, "lava"),
     ])
     scenes.append(house_scene)
     
@@ -775,7 +844,10 @@ def create_level2_scenes():
         GameObject(600, 360, 30, 30, PURPLE, "crystal", crystal_type=2),
         GameObject(250, 380, 30, 30, YELLOW, "coin"),
         GameObject(750, 370, 30, 30, YELLOW, "coin"),
-        GameObject(900, 306, 100, 150, BROWN, "door")
+        GameObject(900, 306, 100, 150, BROWN, "door"),
+        GameObject(100, ground_y - 20, 220, 100, ORANGE, "lava"),
+        GameObject(420, ground_y - 20, 220, 100, ORANGE, "lava"),
+        GameObject(740, ground_y - 20, 220, 100, ORANGE, "lava"),
     ])
     scenes.append(scene2)
     
@@ -812,6 +884,7 @@ def main():
     vasily.keys = 0
     vasily.crystals = 0
     vasily.money = 0
+    vasily.bombs = 1  # в начале игры одна бомба
     boss_defeated = False
     # Позиция на уровне 2
     vasily.x = 50
@@ -825,6 +898,14 @@ def main():
     multiplayer_mode = False  # Режим мультиплеера
     vasily2 = None  # Второй игрок
     in_shop = False  # Игрок внутри дома (магазин) на уровне 2
+    # Взрыв бомбы (F — бросить)
+    explosion_active = False
+    explosion_x = 0
+    explosion_y = 0
+    explosion_timer = 0
+    explosion_damage_dealt = False
+    lava_damage_cooldown = 0  # лава: 5 урона раз в LAVA_DAMAGE_INTERVAL кадров, пока не выйдешь
+    shop_exit_cooldown = 0  # после выхода из магазина (E) — не входить снова по автоповтору E
 
     def reshuffle_middle_scenes():
         nonlocal scenes
@@ -842,8 +923,17 @@ def main():
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_e and in_shop:
-                    # Выход из магазина по E
                     in_shop = False
+                    shop_exit_cooldown = 25  # ~0.4 сек — не реагировать на E у входа
+                elif in_shop and event.key == pygame.K_b and vasily.money >= BOMB_PRICE:
+                    vasily.money -= BOMB_PRICE
+                    vasily.bombs += 1
+                elif not in_shop and event.key == pygame.K_f and vasily.bombs > 0:
+                    vasily.bombs -= 1
+                    explosion_active = True
+                    explosion_x, explosion_y = pygame.mouse.get_pos()
+                    explosion_timer = 0
+                    explosion_damage_dealt = False
                 elif event.key == pygame.K_ESCAPE:
                     # Выход из игры по Escape
                     running = False
@@ -1092,6 +1182,28 @@ def main():
             hero_sprite_width = current_sprite.get_width() if current_sprite else vasily.width
             hero_sprite_height = current_sprite.get_height() if current_sprite else vasily.height
             
+            # Лава на уровне 2: пока стоишь в луже — 5 урона раз в ~1 сек; вышел — урон прекращается
+            if current_level == 2 and not in_shop and not game_over and not victory:
+                in_lava = False
+                hx, hy, hw, hh = vasily.get_defense_hitbox(hero_sprite_width, hero_sprite_height)
+                for obj in current_scene_obj.objects:
+                    if obj.object_type == "lava":
+                        if (hx < obj.x + obj.width and hx + hw > obj.x and
+                                hy < obj.y + obj.height and hy + hh > obj.y):
+                            in_lava = True
+                            break
+                if in_lava:
+                    if lava_damage_cooldown <= 0:
+                        if vasily.take_damage(LAVA_DAMAGE):
+                            game_over = True
+                        else:
+                            print("Лава нанесла 5 урона!")
+                        lava_damage_cooldown = LAVA_DAMAGE_INTERVAL
+                    else:
+                        lava_damage_cooldown -= 1
+                else:
+                    lava_damage_cooldown = 0
+            
             # Сначала проверяем босса отдельно - он должен всегда обновляться и атаковать
             for obj in current_scene_obj.objects:
                 if obj.object_type == "boss":
@@ -1225,11 +1337,48 @@ def main():
                                     game_over = True
                                 else:
                                     print("Босс атаковал второго игрока! -15 HP")
+                
+                elif obj.object_type == "worm" and not obj.defeated:
+                    obj.update(vasily.x, vasily.y)
+                    attack_hitbox = vasily.get_attack_hitbox()
+                    if attack_hitbox and vasily.attacking and not vasily.attack_damage_dealt:
+                        hitbox_x, hitbox_y, hitbox_radius = attack_hitbox
+                        worm_hitbox = obj.get_hitbox()
+                        wx, wy, ww, wh = worm_hitbox
+                        # Увеличенная зона попадания по червю (проще убить)
+                        pad = 12
+                        if (hitbox_x + hitbox_radius > wx - pad and hitbox_x - hitbox_radius < wx + ww + pad and
+                            hitbox_y + hitbox_radius > wy - pad and hitbox_y - hitbox_radius < wy + wh + pad):
+                            if vasily.has_sword:
+                                if obj.take_damage(vasily.get_attack_damage()):
+                                    print("Червь побеждён!")
+                                else:
+                                    print(f"Червь получил урон! HP: {obj.hp}/{obj.max_hp}")
+                                vasily.attack_damage_dealt = True
+                    if not obj.defeated and obj.attack_cooldown >= obj.worm_attack_interval:
+                        worm_attack = obj.get_attack_area(vasily.x)
+                        if worm_attack:
+                            ax, ay, aw, ah = worm_attack
+                            if vasily.attacking and vasily.has_sword:
+                                cur = hero_trident_attack_sprite if vasily.weapon_type == "trident" and hero_trident_attack_sprite else hero_attack_sprite
+                            elif vasily.has_sword:
+                                cur = hero_with_trident_sprite if vasily.weapon_type == "trident" and hero_with_trident_sprite else hero_with_sword_sprite
+                            else:
+                                cur = hero_no_sword_sprite
+                            hw = cur.get_width() if cur else vasily.width
+                            hh = cur.get_height() if cur else vasily.height
+                            hx, hy, hw2, hh2 = vasily.get_defense_hitbox(hw, hh)
+                            if (hx < ax + aw and hx + hw2 > ax and hy < ay + ah and hy + hh2 > ay):
+                                if vasily.take_damage(10):
+                                    game_over = True
+                                else:
+                                    print("Червь атаковал Василия! -10 HP")
+                                obj.attack_cooldown = 0
             
             # Теперь проверяем обычные объекты (ключи, кристаллы, меч, дверь)
             for obj in current_scene_obj.objects:
-                if obj.object_type == "boss":
-                    continue  # Босса уже обработали выше
+                if obj.object_type in ("boss", "worm", "lava"):
+                    continue  # Босса, червей и лаву уже обработали / не взаимодействуют
                 # Новая зона взаимодействия - с учетом направления (ИСПОЛЬЗУЕМ РЕАЛЬНЫЕ РАЗМЕРЫ СПРАЙТА)
                 if vasily.direction == "right":
                     interaction_center_x = vasily.x + hero_sprite_width + 40  # Справа от персонажа
@@ -1242,8 +1391,8 @@ def main():
                 # Проверяем расстояние между центрами зон взаимодействия
                 distance_x = abs(interaction_center_x - obj_center_x)
                 distance_y = abs(interaction_center_y - obj_center_y)
-                if (distance_x < 80 and distance_y < 80 and not obj.collected):
-                    # Подсказки по типу объекта
+                if (distance_x < 80 and distance_y < 80 and not obj.collected and not in_shop):
+                    # Подсказки по типу объекта (в магазине E только выходит, деньги не начисляются)
                     if obj.object_type == "sword_in_stone":
                         interaction_hint = "Меч: нажми E чтобы взять"
                     elif obj.object_type == "trident_in_stone":
@@ -1508,8 +1657,35 @@ def main():
                                     print("Босс атаковал Василия! -15 HP")
                                 obj.attack_cooldown = 0
             
+            # Взрыв бомбы (урон по области)
+            if explosion_active:
+                explosion_timer += 1
+                if explosion_timer == 10 and not explosion_damage_dealt:
+                    for obj in current_scene_obj.objects:
+                        if obj.object_type in ("boss", "worm") and not obj.defeated:
+                            if obj.object_type == "boss":
+                                cx = obj.x + obj.width
+                                cy = obj.y + obj.height
+                            else:
+                                cx = obj.x + obj.width / 2
+                                cy = obj.y + obj.height / 2
+                            dist = math.sqrt((cx - explosion_x) ** 2 + (cy - explosion_y) ** 2)
+                            if dist < BOMB_EXPLOSION_RADIUS:
+                                if obj.take_damage(BOMB_DAMAGE):
+                                    if obj.object_type == "boss":
+                                        current_scene_obj.completed = True
+                                        boss_defeated = True
+                                        vasily.money += 15
+                                    else:
+                                        print("Червь побеждён взрывом!")
+                    explosion_damage_dealt = True
+                if explosion_timer >= 30:
+                    explosion_active = False
+            
             # Вход в дом (магазин) на уровне 2: зона у центра внизу экрана
-            if current_scene_obj.name == "level2_house_scene" and not in_shop:
+            if shop_exit_cooldown > 0:
+                shop_exit_cooldown -= 1
+            if current_scene_obj.name == "level2_house_scene" and not in_shop and shop_exit_cooldown <= 0:
                 entrance_left = SCREEN_WIDTH // 2 - 70
                 entrance_right = SCREEN_WIDTH // 2 + 70
                 entrance_top = SCREEN_HEIGHT - 220
@@ -1611,6 +1787,17 @@ def main():
         # Отрисовка второго игрока (если мультиплеер активен)
         if multiplayer_mode and vasily2:
             vasily2.draw(screen)
+        # Взрыв бомбы (круг по центру)
+        if explosion_active:
+            r = min(explosion_timer * 6, BOMB_EXPLOSION_RADIUS)
+            alpha = 255 - (explosion_timer * 8) if explosion_timer < 32 else 0
+            if alpha > 0:
+                s = pygame.Surface((r * 2, r * 2))
+                s.set_alpha(alpha)
+                s.fill(ORANGE)
+                pygame.draw.circle(s, RED, (r, r), r)
+                screen.blit(s, (explosion_x - r, explosion_y - r))
+        
         # Магазин внутри дома (уровень 2): комната-магазин, в которую можно зайти
         if in_shop and shop_sprite:
             shop_scaled = pygame.transform.scale(shop_sprite, (SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -1619,7 +1806,10 @@ def main():
             welcome_text = shop_font.render("Cheers, home!", True, WHITE)
             welcome_rect = welcome_text.get_rect(center=(SCREEN_WIDTH // 2, 50))
             screen.blit(welcome_text, welcome_rect)
-            shop_hint = shop_font.render("Магазин. E — выйти", True, WHITE)
+            bomb_text = shop_font.render(f"Бомба ({BOMB_DAMAGE} урона) — {BOMB_PRICE} монет. B — купить", True, YELLOW)
+            bomb_rect = bomb_text.get_rect(center=(SCREEN_WIDTH // 2, 100))
+            screen.blit(bomb_text, bomb_rect)
+            shop_hint = shop_font.render("E — один раз нажать чтобы выйти / Press E once to exit", True, WHITE)
             shop_hint_rect = shop_hint.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
             screen.blit(shop_hint, shop_hint_rect)
         
@@ -1667,9 +1857,11 @@ def main():
         
         crystals_text = font.render(f"Кристаллы: {vasily.crystals}", True, BLACK)
         screen.blit(crystals_text, (10, 98))
+        bombs_text = font.render(f"Бомбы: {vasily.bombs} (F — бросить)", True, BLACK)
+        screen.blit(bombs_text, (10, 120))
         
         # Инструкции
-        instruction_text = font.render("WASD - движение, ЛКМ - атака (только с мечом), E - взаимодействие, SPACE - рывок", True, BLACK)
+        instruction_text = font.render("WASD - движение, ЛКМ - атака, E - взаимодействие, SPACE - рывок, F - бомба", True, BLACK)
         screen.blit(instruction_text, (10, SCREEN_HEIGHT - 60))
 
         # Крупный шрифт для подсказок
